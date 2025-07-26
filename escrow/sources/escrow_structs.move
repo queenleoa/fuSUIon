@@ -3,6 +3,8 @@ module escrow::structs;
 
     use std::string::String;
     use sui::balance::Balance;
+    use sui::balance::withdraw_all;
+    use sui::balance::split;
     use sui::sui::SUI;
     use escrow::constants::status_active;
 
@@ -240,6 +242,45 @@ module escrow::structs;
     public(package) fun set_dst_status<T>(escrow: &mut EscrowDst<T>, status: u8) {
         escrow.status = status;
     }
+
+    // ============ Balance Extraction Functions ============
+
+    public(package) fun extract_src_balances<T>(
+        escrow: &mut EscrowSrc<T>
+    ): (Balance<T>, Balance<SUI>) {
+        let token_balance = withdraw_all(&mut escrow.token_balance);
+        let sui_balance = withdraw_all(&mut escrow.sui_balance);
+        (token_balance, sui_balance)
+    }
+
+    public(package) fun extract_dst_balances<T>(
+        escrow: &mut EscrowDst<T>
+    ): (Balance<T>, Balance<SUI>) {
+        let token_balance = withdraw_all(&mut escrow.token_balance);
+        let sui_balance = withdraw_all(&mut escrow.sui_balance);
+        (token_balance, sui_balance)
+    }
+
+    public(package) fun extract_proportional_src_balances<T>(
+        escrow: &mut EscrowSrc<T>,
+        token_amount: u64,
+        sui_amount: u64
+    ): (Balance<T>, Balance<SUI>) {
+        let token_balance = split(&mut escrow.token_balance, token_amount);
+        let sui_balance = split(&mut escrow.sui_balance, sui_amount);
+        (token_balance, sui_balance)
+    }
+
+    public(package) fun extract_proportional_dst_balances<T>(
+        escrow: &mut EscrowDst<T>,
+        token_amount: u64,
+        sui_amount: u64
+    ): (Balance<T>, Balance<SUI>) {
+        let token_balance = split(&mut escrow.token_balance, token_amount);
+        let sui_balance = split(&mut escrow.sui_balance, sui_amount);
+        (token_balance, sui_balance)
+    }
+
 
 
 
