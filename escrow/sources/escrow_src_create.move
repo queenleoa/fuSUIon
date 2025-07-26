@@ -2,12 +2,10 @@
 module escrow::escrow_src_create;
 
     use sui::coin::{Self, Coin};
-    use sui::clock::Clock;
     use sui::sui::SUI;
-
     use escrow::constants;
     use escrow::structs::{EscrowImmutables};
-    use escrow::structs::{get_amount, get_safety_deposit, new_merkle_info, new_escrow_src,get_src_id, get_order_hash,get_maker, get_taker, get_src_immutables};
+    use escrow::structs::{get_amount, get_safety_deposit, new_merkle_info, new_escrow_src,get_src_id, get_order_hash,get_maker, get_taker, get_src_immutables, get_hashlock};
     use escrow::events;
 
     // ============ Creation Functions ============
@@ -17,7 +15,6 @@ module escrow::escrow_src_create;
         immutables: EscrowImmutables,
         token_coin: Coin<T>,
         safety_deposit: Coin<SUI>,
-        clock: &Clock,
         ctx: &mut TxContext
     ) {
         create_with_merkle<T>(
@@ -26,7 +23,6 @@ module escrow::escrow_src_create;
             safety_deposit,
             vector::empty(), // No merkle root for simple escrow
             0, // No parts for simple escrow
-            clock,
             ctx
         )
     }
@@ -38,7 +34,6 @@ module escrow::escrow_src_create;
         safety_deposit: Coin<SUI>,
         merkle_root: vector<u8>,
         parts_amount: u8,
-        clock: &Clock,
         ctx: &mut TxContext
     ) {
         // Validate amounts match immutables
@@ -87,6 +82,42 @@ module escrow::escrow_src_create;
         );
 
         // Share the escrow object for consensus
-        transfer::share_object(escrow);
+        transfer::public_share_object(escrow);
     }
     
+    // ============ Validation Functions ============
+
+    /// Validate immutables before creation
+    public fun validate_immutables(immutables: &EscrowImmutables) {
+        // Validate order hash
+        assert!(
+            vector::length(get_order_hash(immutables)) == 32, 
+            constants::error_invalid_immutables()
+        );
+        
+        // Validate hashlock
+        assert!(
+            vector::length(get_hashlock(immutables)) == 32, 
+            constants::error_invalid_immutables()
+        );
+        
+        // Validate amounts
+        assert!(
+            get_amount(immutables) > 0, 
+            constants::error_invalid_immutables()
+        );
+        assert!(
+            get_safety_deposit(immutables) > 0, 
+            constants::error_invalid_immutables()
+        );
+        
+        // Validate addresses
+        assert!(
+            get_maker(immutables) != @0x0, 
+            constants::error_invalid_immutables()
+        );
+        assert!(
+            get_taker(immutables) != @0x0, 
+            constants::error_invalid_immutables()
+        );
+    }
