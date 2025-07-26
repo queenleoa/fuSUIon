@@ -1,0 +1,149 @@
+/// Module: escrow
+module escrow::escrow_src_withdraw;
+
+    use sui::coin::{Self, Coin};
+    use sui::balance;
+    use sui::clock::{Self, Clock};
+    use sui::sui::SUI;
+    use escrow::constants::{
+        error_invalid_caller,
+        status_active,
+        error_already_withdrawn,
+        src_withdrawal,
+        error_invalid_secret,
+        error_invalid_time,
+        status_withdrawn,
+        src_public_withdrawal,
+         };
+    use escrow::structs::{ 
+        EscrowSrc, 
+        get_src_immutables,
+        get_taker,
+        get_src_status,
+        get_timelocks,
+        get_hashlock,
+        set_src_status,
+        extract_src_balances,
+        get_src_id,
+        };
+    use escrow::events;
+    use escrow::utils::{get_timelock_stage, validate_secret};
+
+    // ============ Simple Withdrawal Functions ============
+
+    /// Withdraw from source escrow (private) - simple version
+    public fun withdraw<T>(
+        escrow: &mut EscrowSrc<T>,
+        secret: vector<u8>,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ): (Coin<T>, Coin<SUI>) {
+        withdraw_to<T>(escrow, secret, tx_context::sender(ctx), clock, ctx)
+    }
+
+    /// Withdraw to specific address - simple version
+    public fun withdraw_to<T>(
+        escrow: &mut EscrowSrc<T>,
+        secret: vector<u8>,
+        target: address,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ): (Coin<T>, Coin<SUI>) {
+        let immutables = get_src_immutables(escrow);
+        
+        // Validate caller is taker
+        assert!(
+            tx_context::sender(ctx) == get_taker(immutables), 
+            error_invalid_caller()
+        );
+        
+        // Validate escrow is active
+        assert!(
+            get_src_status(escrow) == status_active(), 
+            error_already_withdrawn()
+        );
+        
+        // Validate timing - must be after withdrawal time
+        let current_time = clock::timestamp_ms(clock) / 1000;
+        let withdrawal_time = get_timelock_stage(
+            get_timelocks(immutables), 
+            src_withdrawal()
+        );
+        assert!(current_time >= withdrawal_time, error_invalid_time());
+
+        // Validate secret
+        assert!(
+            validate_secret(&secret, get_hashlock(immutables)), 
+            error_invalid_secret()
+        );
+
+        // Mark as withdrawn
+        set_src_status(escrow, status_withdrawn());
+
+        // Extract balances
+        let (token_balance, sui_balance) = extract_src_balances(escrow);
+
+        // Emit withdrawal event
+        events::emit_escrow_withdrawn(
+            get_src_id(escrow),
+            secret,
+            target,
+            balance::value(&token_balance),
+            0, // No merkle index for simple withdrawal
+        );
+
+        // Convert to coins
+        (coin::from_balance(token_balance, ctx), coin::from_balance(sui_balance, ctx))
+    }
+
+    // ============ Public Withdrawal Function ============
+
+    /// Public withdrawal with access token
+    public fun withdraw_public<T>(
+        escrow: &mut EscrowSrc<T>,
+        secret: vector<u8>,
+        clock: &Clock,
+        ctx: &mut TxContext
+    ): (Coin<T>, Coin<SUI>) {
+        let immutables = get_src_immutables(escrow);
+        
+        // Validate escrow is active
+        assert!(
+            get_src_status(escrow) == status_active(), 
+            error_already_withdrawn()
+        );
+        
+        // Validate timing - must be after public withdrawal time
+        let current_time = clock::timestamp_ms(clock) / 1000;
+        let public_withdrawal_time = get_timelock_stage(
+            get_timelocks(immutables), 
+            src_public_withdrawal()
+        );
+        assert!(current_time >= public_withdrawal_time, error_invalid_time());
+
+        // Validate secret
+        assert!(
+           validate_secret(&secret, get_hashlock(immutables)), 
+            error_invalid_secret()
+        );
+
+        // Mark as withdrawn
+       set_src_status(escrow, status_withdrawn());
+
+        // Extract balances
+        let (token_balance, sui_balance) = extract_src_balances(escrow);
+
+        // Emit withdrawal event
+        events::emit_escrow_withdrawn(
+            get_src_id(escrow),
+            secret,
+            tx_context::sender(ctx),
+            balance::value(&token_balance),
+            0,
+        );
+
+        // Convert to coins
+        (coin::from_balance(token_balance, ctx), coin::from_balance(sui_balance, ctx))
+    }
+
+    
