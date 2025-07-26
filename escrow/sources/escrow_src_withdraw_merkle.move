@@ -129,3 +129,57 @@ use sui::coin::{Self, Coin};
         // Execute withdrawal
         execute_merkle_withdrawal(escrow, secret, secret_index, target, ctx)
     }
+// ============ Internal Functions ============
+
+    /// Execute the merkle withdrawal logic
+    fun execute_merkle_withdrawal<T>(
+        escrow: &mut EscrowSrc<T>,
+        secret: vector<u8>,
+        secret_index: u64,
+        target: address,
+        ctx: &mut TxContext
+    ): (Coin<T>, Coin<SUI>) {
+        let immutables = get_src_immutables(escrow);
+        let merkle_info = get_src_merkle_info(escrow);
+        
+        // Mark secret as used
+        mark_secret_used(get_merkle_info_mut(escrow), secret_index);
+
+        // Calculate fill amount
+        let total_amount = get_amount(immutables);
+        let parts_amount = get_parts_amount(merkle_info) as u64;
+        let fill_amount = calculate_partial_fill_amount(
+            total_amount, 
+            parts_amount, 
+            secret_index
+        );
+        let sui_amount = calculate_proportional_safety_deposit(
+            get_safety_deposit(immutables),
+            fill_amount,
+            total_amount
+        );
+
+        // Extract proportional balances
+        let (token_balance, sui_balance) = extract_proportional_src_balances(
+            escrow, 
+            fill_amount, 
+            sui_amount
+        );
+
+        // Check if fully withdrawn
+        if (balance::value(&escrow.token_balance) == 0) {
+            set_src_status(escrow, status_withdrawn());
+        };
+
+        // Emit withdrawal event
+        events::emit_escrow_withdrawn(
+            get_src_id(escrow),
+            secret,
+            target,
+            fill_amount,
+            secret_index,
+        );
+
+        // Convert to coins
+        (coin::from_balance(token_balance, ctx), coin::from_balance(sui_balance, ctx))
+    }
