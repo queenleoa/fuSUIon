@@ -59,3 +59,51 @@ module escrow::events;
         token_id: address,
         created_at: u64,
     }
+
+    // ============ Emit Functions ============
+
+    public fun emit_escrow_src_created(
+        escrow_id: address,
+        order_hash: vector<u8>,
+        maker: address,
+        taker: address,
+        amount: u64,
+        safety_deposit: u64,
+        is_merkle: bool,
+        parts_amount: u8,
+    ) {
+        event::emit(EscrowSrcCreated {
+            escrow_id,
+            order_hash,
+            maker,
+            taker,
+            amount,
+            safety_deposit,
+            is_merkle,
+            parts_amount,
+        })
+    }
+
+    public fun emit_escrow_dst_created(
+        escrow_id: address,
+        order_hash: vector<u8>,
+        maker: address,
+        taker: address,
+        amount: u64,
+        safety_deposit: u64,
+        src_cancellation_timestamp: u64,
+        is_merkle: bool,
+        parts_amount: u8,
+    ) {
+        event::emit(EscrowDstCreated {
+            escrow_id,
+            order_hash,
+            maker,
+            taker,
+            amount,
+            safety_deposit,
+            src_cancellation_timestamp,
+            is_merkle,
+            parts_amount,
+        })
+    }
