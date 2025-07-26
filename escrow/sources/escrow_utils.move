@@ -45,9 +45,42 @@ module escrow::utils;
         vector::contains(used_indices, &(index as u8))
     }
 
-    /// Mark a secret index as used
-    public(package) fun mark_secret_used(merkle_info: &mut MerkleSecretInfo, index: u64) {
-        vector::push_back(&mut merkle_info.used_indices, index as u8);
+    /// Validate partial fill constraints
+    public fun validate_partial_fill(
+        total_amount: u64,
+        remaining_amount: u64,
+        fill_amount: u64,
+        parts_amount: u64,
+        secret_index: u64
+    ): bool {
+        let filled_amount = total_amount - remaining_amount;
+        let expected_index = calculate_expected_index(
+            total_amount,
+            filled_amount,
+            fill_amount,
+            parts_amount
+        );
+        
+        // For the last fill, use the extra secret
+        if (remaining_amount == fill_amount) {
+            expected_index == parts_amount && secret_index == parts_amount
+        } else {
+            expected_index == secret_index
+        }
+    }
+
+    /// Calculate expected secret index for partial fill
+    fun calculate_expected_index(
+        total_amount: u64,
+        filled_amount: u64,
+        fill_amount: u64,
+        parts_amount: u64
+    ): u64 {
+        // Calculate which part this fill completes
+        ((filled_amount + fill_amount - 1) * parts_amount / total_amount)
     }
 
     
+
+
+
