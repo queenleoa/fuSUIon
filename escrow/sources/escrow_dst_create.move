@@ -3,11 +3,10 @@ module escrow::escrow_dst_create;
 
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-
     use escrow::constants::{dst_cancellation, error_invalid_creation_time,error_insufficient_balance, error_invalid_secrets_amount,error_invalid_immutables};
     use escrow::structs::{EscrowImmutables, get_timelocks,get_amount, get_safety_deposit, new_merkle_info, new_escrow_dst, get_order_hash, get_maker, get_taker,get_dst_id, get_dst_immutables };
-    use escrow::events;
     use escrow::utils::{get_timelock_stage};
+    use escrow::events;
 
     /// Create a new destination escrow as a SHARED OBJECT for consensus security
     public fun create<T>(
