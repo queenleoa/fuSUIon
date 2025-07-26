@@ -203,4 +203,8 @@ module escrow::escrow_src_withdraw;
             required_time - current_time
         }
     }
-
+    
+    /// Get the recipient of tokens upon withdrawal
+    public fun get_withdrawal_recipient<T>(escrow: &EscrowSrc<T>): address {
+        get_taker(get_src_immutables(escrow))
+    }
