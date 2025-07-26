@@ -48,4 +48,27 @@ module escrow::structs;
         merkle_info: MerkleSecretInfo,
     }
 
+    /// Destination chain escrow object - SHARED for consensus
+    public struct EscrowDst<phantom T> has key, store {
+        id: UID,
+        immutables: EscrowImmutables,
+        token_balance: Balance<T>,
+        sui_balance: Balance<SUI>,
+        status: u8,
+        merkle_info: MerkleSecretInfo
+    }
+
+    /// Access token for public operations
+    public struct AccessToken has key, store {
+        id: UID,
+        created_at: u64,
+    }
+
+    /// Factory for creating escrows - SHARED object
+    public struct EscrowFactory has key {
+        id: UID,
+        rescue_delay: u64,
+        access_token_supply: u64,
+    }
+
 
