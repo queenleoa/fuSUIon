@@ -4,6 +4,7 @@ module escrow::structs;
     use std::string::String;
     use sui::balance::Balance;
     use sui::sui::SUI;
+    use escrow::constants::status_active;
 
 // ============ Core Structs ============
 
@@ -175,7 +176,70 @@ module escrow::structs;
     public fun get_rescue_delay(factory: &EscrowFactory): u64 { factory.rescue_delay }
     public fun get_access_token_supply(factory: &EscrowFactory): u64 { factory.access_token_supply }
 
-    //access token getter
+    // Access token getter
     public fun get_access_token_created_at(access_token: &AccessToken): u64 { access_token.created_at}
+
+
+    // ============ Escrow Creation Functions ============
+
+    // EscrowSrc setter
+    public(package) fun new_escrow_src<T>(
+        immutables: EscrowImmutables,
+        token_balance: Balance<T>,
+        sui_balance: Balance<SUI>,
+        merkle_info: MerkleSecretInfo,
+        ctx: &mut TxContext,
+    ): EscrowSrc<T> {
+        EscrowSrc {
+            id: object::new(ctx),
+            immutables,
+            token_balance,
+            sui_balance,
+            status: status_active(),
+            merkle_info,
+        }
+    }
+
+    // EscrowDst setter 
+    public(package) fun new_escrow_dst<T>(
+        immutables: EscrowImmutables,
+        token_balance: Balance<T>,
+        sui_balance: Balance<SUI>,
+        merkle_info: MerkleSecretInfo,
+        ctx: &mut TxContext,
+    ): EscrowDst<T> {
+        EscrowDst {
+            id: object::new(ctx),
+            immutables,
+            token_balance,
+            sui_balance,
+            status: status_active(),
+            merkle_info,
+        }
+    }
+
+    // AccessToken setter
+    public(package) fun new_access_token(
+        created_at: u64,
+        ctx: &mut TxContext
+    ): AccessToken {
+        AccessToken {
+            id: object::new(ctx),
+            created_at,
+        }
+    }
+
+    // ============ Status Update Functions ============
+
+    // EscrowSrc status setter
+    public(package) fun set_src_status<T>(escrow: &mut EscrowSrc<T>, status: u8) {
+        escrow.status = status;
+    }
+
+    // EscrowDst status setter
+    public(package) fun set_dst_status<T>(escrow: &mut EscrowDst<T>, status: u8) {
+        escrow.status = status;
+    }
+
 
 
