@@ -172,7 +172,7 @@ module escrow::structs;
     public fun get_dst_status<T>(escrow: &EscrowDst<T>): u8 { escrow.status }
     public fun get_dst_token_balance<T>(escrow: &EscrowDst<T>): &Balance<T> { &escrow.token_balance}
     public fun get_dst_sui_balance<T>(escrow: &EscrowDst<T>): &Balance<SUI> { &escrow.sui_balance}
-    public fun get_dsy_merkle_info<T>(escrow: &EscrowDst<T>): &MerkleSecretInfo { &escrow.merkle_info }
+    public fun get_dst_merkle_info<T>(escrow: &EscrowDst<T>): &MerkleSecretInfo { &escrow.merkle_info }
 
     // Factory getters
     public fun get_rescue_delay(factory: &EscrowFactory): u64 { factory.rescue_delay }
