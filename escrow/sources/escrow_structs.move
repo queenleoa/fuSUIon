@@ -31,4 +31,21 @@ module escrow::structs;
         timelocks: Timelocks,
     }
 
-    
+    // Merkle secret tree info for partial fills
+    public struct MerkleSecretInfo has copy, drop, store {
+        merkle_root: vector<u8>,     // 32 bytes
+        parts_amount: u8,            // Number of parts the order is split into
+        used_indices: vector<u8>,    // Indices of used secrets
+    }
+
+    /// Source chain escrow object - SHARED for consensus
+    public struct EscrowSrc<phantom T> has key, store {
+        id: UID,
+        immutables: EscrowImmutables,
+        token_balance: Balance<T>,
+        sui_balance: Balance<SUI>,
+        status: u8,
+        merkle_info: MerkleSecretInfo,
+    }
+
+
