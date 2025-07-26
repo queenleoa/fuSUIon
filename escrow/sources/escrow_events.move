@@ -107,3 +107,57 @@ module escrow::events;
             parts_amount,
         })
     }
+
+    public fun emit_escrow_withdrawn(
+        escrow_id: address,
+        secret: vector<u8>,
+        recipient: address,
+        amount: u64,
+        merkle_index: u64,
+    ) {
+        event::emit(EscrowWithdrawn {
+            escrow_id,
+            secret,
+            recipient,
+            amount,
+            merkle_index,
+        })
+    }
+
+    public fun emit_escrow_cancelled(
+        escrow_id: address,
+        refund_to: address,
+        amount: u64,
+    ) {
+        event::emit(EscrowCancelled {
+            escrow_id,
+            refund_to,
+            amount,
+        })
+    }
+
+    public fun emit_funds_rescued(
+        escrow_id: address,
+        rescuer: address,
+        token_amount: u64,
+        sui_amount: u64,
+    ) {
+        event::emit(FundsRescued {
+            escrow_id,
+            rescuer,
+            token_amount,
+            sui_amount,
+        })
+    }
+
+    public fun emit_access_token_minted(
+        recipient: address,
+        token_id: address,
+        created_at: u64,
+    ) {
+        event::emit(AccessTokenMinted {
+            recipient,
+            token_id,
+            created_at,
+        })
+    }
