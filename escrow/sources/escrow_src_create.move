@@ -3,7 +3,7 @@ module escrow::escrow_src_create;
 
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-    use escrow::constants;
+    use escrow::constants::{error_insufficient_balance, error_invalid_immutables, error_invalid_secrets_amount};
     use escrow::structs::{EscrowImmutables};
     use escrow::structs::{get_amount, get_safety_deposit, new_merkle_info, new_escrow_src,get_src_id, get_order_hash,get_maker, get_taker, get_src_immutables, get_hashlock};
     use escrow::events;
@@ -39,18 +39,18 @@ module escrow::escrow_src_create;
         // Validate amounts match immutables
         assert!(
             coin::value(&token_coin) == get_amount(&immutables), 
-            constants::error_insufficient_balance()
+            error_insufficient_balance()
         );
         assert!(
             coin::value(&safety_deposit) == get_safety_deposit(&immutables), 
-            constants::error_insufficient_balance()
+            error_insufficient_balance()
         );
 
         // Validate merkle configuration
         let is_merkle = vector::length(&merkle_root) > 0;
         if (is_merkle) {
-            assert!(parts_amount > 0, constants::error_invalid_secrets_amount());
-            assert!(vector::length(&merkle_root) == 32, constants::error_invalid_immutables());
+            assert!(parts_amount > 0, error_invalid_secrets_amount());
+            assert!(vector::length(&merkle_root) == 32, error_invalid_immutables());
         };
 
         // Create merkle info
@@ -92,32 +92,32 @@ module escrow::escrow_src_create;
         // Validate order hash
         assert!(
             vector::length(get_order_hash(immutables)) == 32, 
-            constants::error_invalid_immutables()
+            error_invalid_immutables()
         );
         
         // Validate hashlock
         assert!(
             vector::length(get_hashlock(immutables)) == 32, 
-            constants::error_invalid_immutables()
+            error_invalid_immutables()
         );
         
         // Validate amounts
         assert!(
             get_amount(immutables) > 0, 
-            constants::error_invalid_immutables()
+            error_invalid_immutables()
         );
         assert!(
             get_safety_deposit(immutables) > 0, 
-            constants::error_invalid_immutables()
+            error_invalid_immutables()
         );
         
         // Validate addresses
         assert!(
             get_maker(immutables) != @0x0, 
-            constants::error_invalid_immutables()
+            error_invalid_immutables()
         );
         assert!(
             get_taker(immutables) != @0x0, 
-            constants::error_invalid_immutables()
+            error_invalid_immutables()
         );
     }
