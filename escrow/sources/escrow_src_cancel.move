@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_dst_cancel;
+module escrow::escrow_src_cancel;
 
     use sui::coin::{Self, Coin};
     use sui::clock::{Self, Clock};
