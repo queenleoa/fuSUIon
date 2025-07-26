@@ -4,6 +4,7 @@ module escrow::utils;
     use escrow::constants;
     use escrow::structs::{Timelocks, MerkleSecretInfo};
     use escrow::structs;
+    use sui::hash;
 
  // ============ Timelock Functions ============
 
@@ -29,3 +30,24 @@ module escrow::utils;
             deployed_at
         }
     }
+
+    // ============ Validation Functions ============
+
+    /// Validate secret against hashlock
+    public fun validate_secret(secret: &vector<u8>, hashlock: &vector<u8>): bool {
+        let hashed = hash::keccak256(secret);
+        &hashed == hashlock
+    }
+
+    /// Check if a secret index has been used
+    public fun is_secret_used(merkle_info: &MerkleSecretInfo, index: u64): bool {
+        let used_indices = structs::get_used_indices(merkle_info);
+        vector::contains(used_indices, &(index as u8))
+    }
+
+    /// Mark a secret index as used
+    public(package) fun mark_secret_used(merkle_info: &mut MerkleSecretInfo, index: u64) {
+        vector::push_back(&mut merkle_info.used_indices, index as u8);
+    }
+
+    
