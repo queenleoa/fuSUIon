@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_src_withdraw;
+module escrow::escrow_dst_withdraw;
 
     use sui::coin::{Self, Coin};
     use sui::balance;
@@ -9,47 +9,37 @@ module escrow::escrow_src_withdraw;
         error_invalid_caller,
         status_active,
         error_already_withdrawn,
-        src_withdrawal,
+        dst_withdrawal,
         error_invalid_secret,
         error_invalid_time,
         status_withdrawn,
-        src_public_withdrawal,
+        dst_public_withdrawal,
     };
-    use escrow::structs::{ 
-        EscrowSrc, 
-        get_src_immutables,
+    use escrow::structs::{
+        EscrowDst,
+        get_dst_immutables,
         get_taker,
-        get_src_status,
+        get_maker,
+        get_dst_status,
         get_timelocks,
         get_hashlock,
-        get_src_id,
-        set_src_status, 
-        extract_src_balances
+        get_dst_id,
+        set_dst_status, 
+        extract_dst_balances
         };
     use escrow::events;
     use escrow::utils::{get_timelock_stage, validate_secret};
 
-    // ============ Simple Withdrawal Functions ============
+    // ============ Private Withdrawal ============
 
-    /// Withdraw from source escrow (private) - simple version
+    /// Withdraw from destination escrow (private) - only taker can call
     public fun withdraw<T>(
-        escrow: &mut EscrowSrc<T>,
+        escrow: &mut EscrowDst<T>,
         secret: vector<u8>,
         clock: &Clock,
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
-        withdraw_to<T>(escrow, secret, tx_context::sender(ctx), clock, ctx)
-    }
-
-    /// Withdraw to specific address - simple version
-    public fun withdraw_to<T>(
-        escrow: &mut EscrowSrc<T>,
-        secret: vector<u8>,
-        target: address,
-        clock: &Clock,
-        ctx: &mut TxContext
-    ): (Coin<T>, Coin<SUI>) {
-        let immutables = get_src_immutables(escrow);
+        let immutables = get_dst_immutables(escrow);
         
         // Validate caller is taker
         assert!(
@@ -59,7 +49,7 @@ module escrow::escrow_src_withdraw;
         
         // Validate escrow is active
         assert!(
-            get_src_status(escrow) == status_active(), 
+            get_dst_status(escrow) == status_active(), 
             error_already_withdrawn()
         );
         
@@ -67,7 +57,7 @@ module escrow::escrow_src_withdraw;
         let current_time = clock::timestamp_ms(clock) / 1000;
         let withdrawal_time = get_timelock_stage(
             get_timelocks(immutables), 
-            src_withdrawal()
+            dst_withdrawal()
         );
         assert!(current_time >= withdrawal_time, error_invalid_time());
 
@@ -78,23 +68,23 @@ module escrow::escrow_src_withdraw;
         );
 
         // Execute withdrawal
-        execute_withdrawal(escrow, secret, target, ctx)
+        execute_withdrawal(escrow, secret, ctx)
     }
 
-    // ============ Public Withdrawal Function ============
+    // ============ Public Withdrawal ============
 
     /// Public withdrawal with access token
     public fun withdraw_public<T>(
-        escrow: &mut EscrowSrc<T>,
+        escrow: &mut EscrowDst<T>,
         secret: vector<u8>,
         clock: &Clock,
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
-        let immutables = get_src_immutables(escrow);
+        let immutables = get_dst_immutables(escrow);
         
         // Validate escrow is active
         assert!(
-            get_src_status(escrow) == status_active(), 
+            get_dst_status(escrow) == status_active(), 
             error_already_withdrawn()
         );
         
@@ -102,7 +92,7 @@ module escrow::escrow_src_withdraw;
         let current_time = clock::timestamp_ms(clock) / 1000;
         let public_withdrawal_time = get_timelock_stage(
             get_timelocks(immutables), 
-            src_public_withdrawal()
+            dst_public_withdrawal()
         );
         assert!(current_time >= public_withdrawal_time, error_invalid_time());
 
@@ -113,50 +103,58 @@ module escrow::escrow_src_withdraw;
         );
 
         // Execute withdrawal
-        execute_withdrawal(escrow, secret, tx_context::sender(ctx), ctx)
+        execute_withdrawal(escrow, secret, ctx)
     }
 
     // ============ Internal Functions ============
 
     /// Execute the withdrawal logic
     fun execute_withdrawal<T>(
-        escrow: &mut EscrowSrc<T>,
+        escrow: &mut EscrowDst<T>,
         secret: vector<u8>,
-        recipient: address,
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
+        let immutables = get_dst_immutables(escrow);
+        let maker = get_maker(immutables);
+        
         // Mark as withdrawn
-        set_src_status(escrow, status_withdrawn());
+        set_dst_status(escrow, status_withdrawn());
 
         // Extract balances
-        let (token_balance, sui_balance) = extract_src_balances(escrow);
+        let (token_balance, sui_balance) = extract_dst_balances(escrow);
 
         // Emit withdrawal event
         events::emit_escrow_withdrawn(
-            get_src_id(escrow),
+            get_dst_id(escrow),
             secret,
-            recipient,
+            maker, // Tokens go to maker on dst chain
             balance::value(&token_balance),
-            0, // No merkle index for simple withdrawal
+            0,
         );
 
-        // Convert to coins
-        (coin::from_balance(token_balance, ctx), coin::from_balance(sui_balance, ctx))
+        // Transfer tokens to maker
+        transfer::public_transfer(
+            coin::from_balance(token_balance, ctx),
+            maker
+        );
+
+        // Return safety deposit to withdrawer
+        (coin::zero<T>(ctx), coin::from_balance(sui_balance, ctx))
     }
 
     // ============ View Functions ============
 
     /// Check if withdrawal is possible
     public fun can_withdraw<T>(
-        escrow: &EscrowSrc<T>,
+        escrow: &EscrowDst<T>,
         clock: &Clock,
         is_public: bool
     ): bool {
-        let immutables = get_src_immutables(escrow);
+        let immutables = get_dst_immutables(escrow);
         let current_time = clock::timestamp_ms(clock) / 1000;
         
         // Check if already processed
-        if (get_src_status(escrow) != status_active()) {
+        if (get_dst_status(escrow) != status_active()) {
             return false
         };
         
@@ -164,12 +162,12 @@ module escrow::escrow_src_withdraw;
         let required_time = if (is_public) {
             get_timelock_stage(
                 get_timelocks(immutables), 
-                src_public_withdrawal()
+                dst_public_withdrawal()
             )
         } else {
             get_timelock_stage(
                 get_timelocks(immutables), 
-                src_withdrawal()
+                dst_withdrawal()
             )
         };
         
@@ -178,22 +176,22 @@ module escrow::escrow_src_withdraw;
 
     /// Get time until withdrawal is possible
     public fun time_until_withdrawal<T>(
-        escrow: &EscrowSrc<T>,
+        escrow: &EscrowDst<T>,
         clock: &Clock,
         is_public: bool
     ): u64 {
-        let immutables = get_src_immutables(escrow);
+        let immutables = get_dst_immutables(escrow);
         let current_time = clock::timestamp_ms(clock) / 1000;
         
         let required_time = if (is_public) {
             get_timelock_stage(
                 get_timelocks(immutables), 
-                src_public_withdrawal()
+                dst_public_withdrawal()
             )
         } else {
             get_timelock_stage(
                 get_timelocks(immutables), 
-                src_withdrawal()
+                dst_withdrawal()
             )
         };
         
@@ -204,3 +202,7 @@ module escrow::escrow_src_withdraw;
         }
     }
 
+    /// Get the recipient of tokens upon withdrawal
+    public fun get_withdrawal_recipient<T>(escrow: &EscrowDst<T>): address {
+        get_maker(get_dst_immutables(escrow))
+    }
