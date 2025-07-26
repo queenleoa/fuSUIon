@@ -98,3 +98,30 @@ module escrow::escrow_dst_create;
         transfer::public_share_object(escrow);
     }
 
+    // ============ Validation Functions ============
+
+    /// Validate destination escrow creation parameters
+    public fun validate_creation_params(
+        immutables: &EscrowImmutables,
+        src_cancellation_timestamp: u64,
+    ): bool {
+        // Check timing constraint
+        let dst_cancellation_time = get_timelock_stage(
+            get_timelocks(immutables), 
+            dst_cancellation()
+        );
+        
+        dst_cancellation_time <= src_cancellation_timestamp
+    }
+
+    /// Calculate required coin amounts for creation
+    public fun calculate_required_amounts(
+        immutables: &EscrowImmutables
+    ): (u64, u64) {
+        (
+            get_amount(immutables),
+            get_safety_deposit(immutables)
+        )
+    }
+
+
