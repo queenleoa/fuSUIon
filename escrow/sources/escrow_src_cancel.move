@@ -5,8 +5,8 @@ use sui::coin::{Self, Coin};
     use sui::balance;
     use sui::clock::{Self, Clock};
     use sui::sui::SUI;
-    use escrow::constants::{error_invalid_caller,status_active, error_already_cancelled, src_cancellation, error_invalid_time};
-    use escrow::structs::{Self, EscrowSrc, AccessToken, get_src_immutables,get_taker, get_timelocks};
+    use escrow::constants::{error_invalid_caller,status_active, error_already_cancelled, src_cancellation, error_invalid_time, status_cancelled};
+    use escrow::structs::{Self, EscrowSrc, AccessTokengi, get_src_immutables,get_taker, get_maker, get_timelocks, set_src_status, extract_src_balances};
     use escrow::events;
     use escrow::utils;
 
@@ -43,4 +43,37 @@ use sui::coin::{Self, Coin};
         // Execute cancellation
         execute_cancellation(escrow, ctx)
     }
+
+    // ============ Internal Functions ============
+
+    /// Execute the cancellation logic
+    fun execute_cancellation<T>(
+        escrow: &mut EscrowSrc<T>,
+        ctx: &mut TxContext
+    ): (Coin<T>, Coin<SUI>) {
+        let immutables = get_src_immutables(escrow);
+        
+        // Mark as cancelled
+        set_src_status(escrow, status_cancelled());
+
+        // Extract balances
+        let (token_balance, sui_balance) = extract_src_balances(escrow);
+
+        // Emit cancellation event
+        events::emit_escrow_cancelled(
+            structs::get_src_id(escrow),
+            structs::get_maker(immutables), // Refund to maker
+            sui::balance::value(&token_balance),
+        );
+
+        // Tokens go to maker, safety deposit to canceller
+        transfer::public_transfer(
+            sui::coin::from_balance(token_balance, ctx),
+            get_maker(immutables)
+        );
+
+        // Return safety deposit to canceller
+        (coin::zero<T>(ctx), coin::from_balance(sui_balance, ctx))
+    }
+
 
