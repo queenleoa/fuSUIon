@@ -6,7 +6,7 @@ module escrow::escrow_src_create;
     use sui::sui::SUI;
 
     use escrow::constants;
-    use escrow::structs::EscrowImmutables;
+    use escrow::structs::{EscrowImmutables};
     use escrow::structs::{get_amount, get_safety_deposit, new_merkle_info, new_escrow_src,get_src_id, get_order_hash,get_maker, get_taker, get_src_immutables};
     use escrow::events;
 
