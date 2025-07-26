@@ -25,6 +25,8 @@ module escrow::events;
         amount: u64,
         safety_deposit: u64,
         src_cancellation_timestamp: u64,
+        is_merkle: bool,
+        parts_amount: u8,
     }
 
     /// Emitted when an escrow is withdrawn
