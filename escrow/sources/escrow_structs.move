@@ -281,6 +281,30 @@ module escrow::structs;
         (token_balance, sui_balance)
     }
 
+    // ============ Merkle Info Functions ============
+
+    public(package) fun get_merkle_info_mut<T>(escrow: &mut EscrowSrc<T>): &mut MerkleSecretInfo {
+        &mut escrow.merkle_info
+    }
+
+    public(package) fun get_dst_merkle_info_mut<T>(escrow: &mut EscrowDst<T>): &mut MerkleSecretInfo {
+        &mut escrow.merkle_info
+    }
+
+    /// Mark a secret index as used
+    public(package) fun mark_secret_used(merkle_info: &mut MerkleSecretInfo, index: u64) {
+        vector::push_back(&mut merkle_info.used_indices, index as u8);
+    }
+
+    // ============ Factory State Functions ============
+
+    public(package) fun increment_access_token_supply(factory: &mut EscrowFactory) {
+        factory.access_token_supply = factory.access_token_supply + 1;
+    }
+
+    public(package) fun update_rescue_delay(factory: &mut EscrowFactory, new_delay: u64) {
+        factory.rescue_delay = new_delay;
+    }
 
 
 
