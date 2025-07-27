@@ -1,14 +1,10 @@
 /// Module: escrow
 module escrow::escrow_dst_withdraw_merkle;
 
-use sui::coin::{Self, Coin};
-    use sui::balance;
+    use sui::coin::{Self, Coin};
     use sui::clock::{Self, Clock};
-    use sui::tx_context::{Self, TxContext};
-    use sui::transfer;
     use sui::sui::SUI;
     use sui::hash;
-
     use escrow::constants::{
         error_invalid_caller,
         status_active,
@@ -23,7 +19,6 @@ use sui::coin::{Self, Coin};
     };
     use escrow::structs::{
         EscrowDst,
-        AccessToken,
         get_dst_immutables,
         get_taker,
         get_maker,
@@ -40,6 +35,7 @@ use sui::coin::{Self, Coin};
         extract_proportional_dst_balances,
         get_dst_merkle_info_mut,
         mark_secret_used,
+        dst_token_balance_value
     };
     use escrow::events;
     use escrow::utils::{
@@ -63,7 +59,6 @@ use sui::coin::{Self, Coin};
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
         let immutables = get_dst_immutables(escrow);
-        let merkle_info = get_dst_merkle_info(escrow);
         
         // Validate caller is taker
         assert!(
@@ -168,56 +163,49 @@ use sui::coin::{Self, Coin};
         secret_index: u64,
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
-        let immutables = get_dst_immutables(escrow);
-        let merkle_info = get_dst_merkle_info(escrow);
-        let maker = get_maker(immutables);
-        
-        // Mark secret as used
-        mark_secret_used(get_dst_merkle_info_mut(escrow), secret_index);
+         /*── 1️⃣  Grab all read-only data first ───────────────────*/
+    let maker          = get_maker(get_dst_immutables(escrow));
+    let total_amount   = get_amount(get_dst_immutables(escrow));
+    let safety_deposit = get_safety_deposit(get_dst_immutables(escrow));
+    let parts_amount   = get_parts_amount(get_dst_merkle_info(escrow)) as u64;
 
-        // Calculate fill amount
-        let total_amount = get_amount(immutables);
-        let parts_amount = get_parts_amount(merkle_info) as u64;
-        let fill_amount = calculate_partial_fill_amount(
-            total_amount, 
-            parts_amount, 
-            secret_index
-        );
-        let sui_amount = calculate_proportional_safety_deposit(
-            get_safety_deposit(immutables),
-            fill_amount,
-            total_amount
-        );
+    /*── 2️⃣  Now we’re free to mutate escrow ─────────────────*/
+    mark_secret_used(get_dst_merkle_info_mut(escrow), secret_index);
 
-        // Extract proportional balances
-        let (token_balance, sui_balance) = extract_proportional_dst_balances(
-            escrow, 
-            fill_amount, 
-            sui_amount
-        );
+    /*── 3️⃣  Compute proportional amounts  ───────────────────*/
+    let fill_amount = calculate_partial_fill_amount(
+        total_amount, parts_amount, secret_index
+    );
+    let sui_amount  = calculate_proportional_safety_deposit(
+        safety_deposit, fill_amount, total_amount
+    );
 
-        // Check if fully withdrawn
-        if (balance::value(&escrow.token_balance) == 0) {
-            set_dst_status(escrow, status_withdrawn());
-        };
+    /*── 4️⃣  Pull coins out of the escrow  ───────────────────*/
+    let (token_bal, sui_bal) = extract_proportional_dst_balances(
+        escrow, fill_amount, sui_amount
+    );
 
-        // Emit withdrawal event
-        events::emit_escrow_withdrawn(
-            get_dst_id(escrow),
-            secret,
-            maker, // Tokens go to maker
-            fill_amount,
-            secret_index,
-        );
+    /*── 5️⃣  If nothing left, flip status  ───────────────────*/
+    if (dst_token_balance_value(escrow) == 0) {
+        set_dst_status(escrow, status_withdrawn());
+    };
 
-        // Transfer tokens to maker
-        transfer::public_transfer(
-            coin::from_balance(token_balance, ctx),
-            maker
-        );
+    /*── 6️⃣  Emit event & pay maker  ─────────────────────────*/
+    events::emit_escrow_withdrawn(
+        get_dst_id(escrow),
+        secret,
+        maker,
+        fill_amount,
+        secret_index,
+    );
 
-        // Return safety deposit to withdrawer
-        (coin::zero<T>(ctx), coin::from_balance(sui_balance, ctx))
+    transfer::public_transfer(
+        coin::from_balance(token_bal, ctx),  // tokens → maker
+        maker
+    );
+
+    /*── 7️⃣  Return the SUI safety-deposit to caller ─────────*/
+    (coin::zero<T>(ctx), coin::from_balance(sui_bal, ctx))
     }
 
     // ============ View Functions ============
@@ -281,11 +269,11 @@ use sui::coin::{Self, Coin};
         
         (fill_amount, sui_amount)
     }
-
+   
     /// Get remaining withdrawable amount
     public fun get_remaining_amount<T>(escrow: &EscrowDst<T>): u64 {
-        balance::value(&escrow.token_balance)
-    }
+        dst_token_balance_value(escrow)
+   }
 
     /// Get list of used secret indices
     public fun get_used_indices_dst<T>(escrow: &EscrowDst<T>): &vector<u8> {
