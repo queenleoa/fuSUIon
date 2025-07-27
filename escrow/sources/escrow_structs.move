@@ -28,7 +28,19 @@ module escrow::structs;
         used_indices: vector<u8>,    // Indices of used secrets
     }
 
-    /// Source chain escrow object - SHARED for consensus
+    /// Timelocks configuration
+    public struct Timelocks has copy, drop, store {
+        deployed_at: u64,
+        src_withdrawal: u64,
+        src_public_withdrawal: u64,
+        src_cancellation: u64,
+        src_public_cancellation: u64,
+        dst_withdrawal: u64,
+        dst_public_withdrawal: u64,
+        dst_cancellation: u64,
+    }
+
+    /// Source chain escrow object - ensure SHARED for consensus
     /// holds maker tokens
     public struct EscrowSrc<phantom T> has key, store {
         id: UID,
@@ -39,7 +51,7 @@ module escrow::structs;
         merkle_info: MerkleSecretInfo,
     }
 
-    /// Destination chain escrow object - SHARED for consensus
+    /// Destination chain escrow object - ensure SHARED for consensus
     /// holds taker tokens
     public struct EscrowDst<phantom T> has key, store {
         id: UID,
@@ -67,12 +79,7 @@ module escrow::structs;
         used: bool,
     }
 
-    /// Timelocks packed into u256
-    public struct Timelocks has store, copy, drop {
-        value: u256,
-    }
-
-     // ============ Constructor Functions ============
+    // ============ Constructor Functions ============
 
     public fun new_immutables(
         order_hash: vector<u8>,
@@ -107,8 +114,26 @@ module escrow::structs;
         }
     }
 
-    public fun new_timelocks(value: u256): Timelocks {
-        Timelocks { value }
+    public fun new_timelocks(
+        deployed_at: u64,
+        src_withdrawal: u64,
+        src_public_withdrawal: u64,
+        src_cancellation: u64,
+        src_public_cancellation: u64,
+        dst_withdrawal: u64,
+        dst_public_withdrawal: u64,
+        dst_cancellation: u64,
+    ): Timelocks {
+        Timelocks {
+            deployed_at,
+            src_withdrawal,
+            src_public_withdrawal,
+            src_cancellation,
+            src_public_cancellation,
+            dst_withdrawal,
+            dst_public_withdrawal,
+            dst_cancellation,
+        }
     }
 
     // ============ Getter Functions ============
@@ -157,8 +182,14 @@ module escrow::structs;
     public fun get_access_token_address(tok: &AccessToken): address { object::uid_to_address(&tok.id) }
 
     // Timelocks getter
-    public fun get_timelocks_value(timelocks: &Timelocks): u256 { timelocks.value }
-
+    public fun get_deployed_at(timelocks: &Timelocks): u64 { timelocks.deployed_at }
+    public fun get_src_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_withdrawal }
+    public fun get_src_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_public_withdrawal }
+    public fun get_src_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_cancellation }
+    public fun get_src_public_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_public_cancellation }
+    public fun get_dst_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_withdrawal }
+    public fun get_dst_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_public_withdrawal }
+    public fun get_dst_cancellation_time(timelocks: &Timelocks): u64 { timelocks.dst_cancellation }
     // ============ Escrow Creation Functions ============
 
     // EscrowSrc setter
@@ -375,9 +406,9 @@ module escrow::structs;
     /// Consume and destroy MerkleSecretInfo explicitly.
     public(package) fun destroy_merkle_info(info: MerkleSecretInfo) {
     let MerkleSecretInfo {
-        merkle_root: _,                    // ok to drop
+        merkle_root: _,                    
         parts_amount:_,
-        used_indices:_,          // vector by defauly 
+        used_indices:_,          
     } = info;
     }
 

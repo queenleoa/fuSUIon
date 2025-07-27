@@ -15,7 +15,7 @@ use sui::coin::{Self, Coin};
         get_dst_immutables,
         get_dst_status,
         get_timelocks,
-        get_timelocks_value,
+        get_deployed_at,
         get_dst_id,
         extract_dst_balances,
         dst_sui_balance_value,

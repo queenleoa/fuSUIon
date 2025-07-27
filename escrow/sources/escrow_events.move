@@ -14,6 +14,7 @@ module escrow::events;
         safety_deposit: u64,
         is_merkle: bool,
         parts_amount: u8,
+        deployed_at: u64,
     }
 
     /// Emitted when a destination escrow is created
@@ -27,6 +28,7 @@ module escrow::events;
         src_cancellation_timestamp: u64,
         is_merkle: bool,
         parts_amount: u8,
+        deployed_at: u64,
     }
 
     /// Emitted when an escrow is withdrawn
@@ -36,6 +38,7 @@ module escrow::events;
         recipient: address,
         amount: u64,
         merkle_index: u64, // 0 if not merkle withdrawal
+        withdrawn_at: u64,
     }
 
     /// Emitted when an escrow is cancelled
@@ -43,6 +46,7 @@ module escrow::events;
         escrow_id: address,
         refund_to: address,
         amount: u64,
+        cancelled_at: u64,
     }
 
     /// Emitted when funds are rescued
@@ -51,6 +55,7 @@ module escrow::events;
         rescuer: address,
         token_amount: u64,
         sui_amount: u64,
+        rescued_at: u64,
     }
 
     /// Emitted when access token is minted
@@ -58,6 +63,7 @@ module escrow::events;
         recipient: address,
         token_id: address,
         created_at: u64,
+        minted_at: u64,
     }
 
     // ============ Emit Functions ============
@@ -71,6 +77,7 @@ module escrow::events;
         safety_deposit: u64,
         is_merkle: bool,
         parts_amount: u8,
+        deployed_at: u64,
     ) {
         event::emit(EscrowSrcCreated {
             escrow_id,
@@ -81,6 +88,7 @@ module escrow::events;
             safety_deposit,
             is_merkle,
             parts_amount,
+            deployed_at,
         })
     }
 
@@ -94,6 +102,7 @@ module escrow::events;
         src_cancellation_timestamp: u64,
         is_merkle: bool,
         parts_amount: u8,
+        deployed_at: u64,
     ) {
         event::emit(EscrowDstCreated {
             escrow_id,
@@ -105,6 +114,7 @@ module escrow::events;
             src_cancellation_timestamp,
             is_merkle,
             parts_amount,
+            deployed_at,
         })
     }
 
@@ -114,6 +124,7 @@ module escrow::events;
         recipient: address,
         amount: u64,
         merkle_index: u64,
+        withdrawn_at: u64,
     ) {
         event::emit(EscrowWithdrawn {
             escrow_id,
@@ -121,6 +132,7 @@ module escrow::events;
             recipient,
             amount,
             merkle_index,
+            withdrawn_at,
         })
     }
 
@@ -128,11 +140,13 @@ module escrow::events;
         escrow_id: address,
         refund_to: address,
         amount: u64,
+        cancelled_at: u64,
     ) {
         event::emit(EscrowCancelled {
             escrow_id,
             refund_to,
             amount,
+            cancelled_at,
         })
     }
 
@@ -141,12 +155,14 @@ module escrow::events;
         rescuer: address,
         token_amount: u64,
         sui_amount: u64,
+        rescued_at: u64,
     ) {
         event::emit(FundsRescued {
             escrow_id,
             rescuer,
             token_amount,
             sui_amount,
+            rescued_at,
         })
     }
 
@@ -154,10 +170,12 @@ module escrow::events;
         recipient: address,
         token_id: address,
         created_at: u64,
+        minted_at: u64,
     ) {
         event::emit(AccessTokenMinted {
             recipient,
             token_id,
             created_at,
+            minted_at,
         })
     }

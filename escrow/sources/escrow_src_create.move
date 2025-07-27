@@ -2,38 +2,40 @@
 module escrow::escrow_src_create;
 
     use sui::coin::{Self, Coin};
+    use sui::clock::Clock;
     use sui::sui::SUI;
-    use escrow::constants::{error_insufficient_balance, error_invalid_immutables, error_invalid_secrets_amount};
+    use escrow::constants::{
+        error_insufficient_balance, 
+        error_invalid_immutables, 
+        error_invalid_secrets_amount
+        };
     use escrow::structs::{EscrowImmutables};
-    use escrow::structs::{get_amount, get_safety_deposit, new_merkle_info, new_escrow_src,get_src_id, get_order_hash,get_maker, get_taker, get_src_immutables, get_hashlock};
+    use escrow::structs::{
+        get_amount, 
+        get_safety_deposit, 
+        new_merkle_info, 
+        new_escrow_src,
+        get_src_id, 
+        get_order_hash,
+        get_maker, 
+        get_taker, 
+        get_src_immutables, 
+        get_hashlock,
+        get_deployed_at,
+        get_timelocks,
+        };
     use escrow::events;
 
-    // ============ Creation Functions ============
+    // ============ Creation Function ============
 
     /// Create a new source escrow as a SHARED OBJECT for consensus security
     public fun create<T>(
         immutables: EscrowImmutables,
         token_coin: Coin<T>,
         safety_deposit: Coin<SUI>,
-        ctx: &mut TxContext
-    ) {
-        create_with_merkle<T>(
-            immutables,
-            token_coin,
-            safety_deposit,
-            vector::empty(), // No merkle root for simple escrow
-            0, // No parts for simple escrow
-            ctx
-        )
-    }
-
-    /// Create a new source escrow with merkle tree support for partial fills
-    public fun create_with_merkle<T>(
-        immutables: EscrowImmutables,
-        token_coin: Coin<T>,
-        safety_deposit: Coin<SUI>,
         merkle_root: vector<u8>,
         parts_amount: u8,
+        clock: &Clock,
         ctx: &mut TxContext
     ) {
         // Validate amounts match immutables
@@ -51,17 +53,15 @@ module escrow::escrow_src_create;
         if (is_merkle) {
             assert!(parts_amount > 0, error_invalid_secrets_amount());
             assert!(vector::length(&merkle_root) == 32, error_invalid_immutables());
+        } else {
+            assert!(parts_amount == 0, error_invalid_secrets_amount());
         };
 
         // Create merkle info
-        let merkle_info = if (is_merkle) {
-            new_merkle_info(merkle_root, parts_amount)
-        } else {
-            new_merkle_info(vector::empty(), 0)
-        };
-
+        let merkle_info = new_merkle_info(merkle_root, parts_amount);
+       
         // Create escrow
-        let escrow = new_escrow_src<T>(
+        let escrow = new_escrow_src(
             immutables,
             coin::into_balance(token_coin),
             coin::into_balance(safety_deposit),
@@ -69,20 +69,33 @@ module escrow::escrow_src_create;
             ctx
         );
 
+        let escrow_id = get_src_id(&escrow);
+        let order_hash = *get_order_hash(get_src_immutables(&escrow));
+        let maker = get_maker(get_src_immutables(&escrow));
+        let taker = get_taker(get_src_immutables(&escrow));
+        let amount = get_amount(get_src_immutables(&escrow));
+        let safety_deposit = get_safety_deposit(get_src_immutables(&escrow));
+
+        // Set deployed_at timestamp in timelocks
+        let timelocks = get_timelocks(get_src_immutables(&escrow));
+        let current_time = sui::clock::timestamp_ms(clock) / 1000;
+        let deployed_at = get_deployed_at(timelocks);
+
+        // CRITICAL: Share the escrow object for multi-party access
+        transfer::public_share_object(escrow);
+
         // Emit creation event
         events::emit_escrow_src_created(
-            get_src_id(&escrow),
-            *get_order_hash(get_src_immutables(&escrow)),
-            get_maker(get_src_immutables(&escrow)),
-            get_taker(get_src_immutables(&escrow)),
-            get_amount(get_src_immutables(&escrow)),
-            get_safety_deposit(get_src_immutables(&escrow)),
+            escrow_id,
+            order_hash,
+            maker,
+            taker,
+            amount,
+            safety_deposit,
             is_merkle,
             parts_amount,
+            deployed_at,
         );
-
-        // Share the escrow object for consensus
-        transfer::public_share_object(escrow);
     }
     
     // ============ Validation Functions ============
@@ -110,7 +123,7 @@ module escrow::escrow_src_create;
             get_safety_deposit(immutables) > 0, 
             error_invalid_immutables()
         );
-        
+          
         // Validate addresses
         assert!(
             get_maker(immutables) != @0x0, 

@@ -3,38 +3,39 @@ module escrow::escrow_dst_create;
 
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
-    use escrow::constants::{dst_cancellation, error_invalid_creation_time,error_insufficient_balance, error_invalid_secrets_amount,error_invalid_immutables};
-    use escrow::structs::{EscrowImmutables, get_timelocks,get_amount, get_safety_deposit, new_merkle_info, new_escrow_dst, get_order_hash, get_maker, get_taker,get_dst_id, get_dst_immutables };
+    use escrow::constants::{
+        dst_cancellation, 
+        error_invalid_creation_time,
+        error_insufficient_balance, 
+        error_invalid_secrets_amount,
+        error_invalid_immutables
+        };
+    use escrow::structs::{
+        EscrowImmutables, 
+        get_timelocks,get_amount, 
+        get_safety_deposit, 
+        new_merkle_info, 
+        new_escrow_dst, 
+        get_order_hash, 
+        get_maker, 
+        get_taker,
+        get_dst_id, 
+        get_dst_immutables,
+        get_deployed_at,
+         };
     use escrow::utils::{get_timelock_stage};
     use escrow::events;
+    use sui::clock::Clock;
 
     /// Create a new destination escrow as a SHARED OBJECT for consensus security
     public fun create<T>(
         immutables: EscrowImmutables,
         token_coin: Coin<T>,
         safety_deposit: Coin<SUI>,
-        src_cancellation_timestamp: u64,
-        ctx: &mut TxContext
-    ) {
-        create_with_merkle<T>(
-            immutables,
-            token_coin,
-            safety_deposit,
-            vector::empty(), // No merkle root for simple escrow
-            0, // No parts for simple escrow
-            src_cancellation_timestamp,
-            ctx
-        )
-    }
-
-    /// Create a new destination escrow with merkle tree support for partial fills
-    public fun create_with_merkle<T>(
-        immutables: EscrowImmutables,
-        token_coin: Coin<T>,
-        safety_deposit: Coin<SUI>,
         merkle_root: vector<u8>,
         parts_amount: u8,
         src_cancellation_timestamp: u64,
+        clock: &Clock,
         ctx: &mut TxContext
     ) {
         // Validate deployment timing - dst cancellation must not be later than src cancellation
@@ -81,17 +82,32 @@ module escrow::escrow_dst_create;
             ctx
         );
 
+        let escrow_id = get_dst_id(&escrow);
+        let order_hash = *get_order_hash(get_dst_immutables(&escrow));
+        let maker = get_maker(get_dst_immutables(&escrow));
+        let taker = get_taker(get_dst_immutables(&escrow));
+        let amount = get_amount(get_dst_immutables(&escrow));
+        let safety_deposit = get_safety_deposit(get_dst_immutables(&escrow));
+
+        // Set deployed_at timestamp in timelocks
+        let timelocks = get_timelocks(get_dst_immutables(&escrow));
+        let current_time = sui::clock::timestamp_ms(clock) / 1000;
+
+        let deployed_at = get_deployed_at(timelocks);
+
+
         // Emit creation event
         events::emit_escrow_dst_created(
-            get_dst_id(&escrow),
-            *get_order_hash(get_dst_immutables(&escrow)),
-            get_maker(get_dst_immutables(&escrow)),
-            get_taker(get_dst_immutables(&escrow)),
-            get_amount(get_dst_immutables(&escrow)),
-            get_safety_deposit(get_dst_immutables(&escrow)),
+           escrow_id,
+            order_hash,
+            maker,
+            taker,
+            amount,
+            safety_deposit,
             src_cancellation_timestamp,
             is_merkle,
             parts_amount,
+            deployed_at,
         );
 
         // Share the escrow object for consensus
