@@ -181,6 +181,11 @@ module escrow::structs;
     // Access token getter
     public fun get_access_token_created_at(access_token: &AccessToken): u64 { access_token.created_at}
 
+    public fun get_access_token_address(tok: &AccessToken): address {
+    object::uid_to_address(&tok.id)   // legal here; we own the struct
+    }
+
+
 
     // ============ Escrow Creation Functions ============
 
