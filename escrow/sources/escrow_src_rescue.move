@@ -16,7 +16,7 @@ module escrow::escrow_src_rescue;
         get_src_immutables,
         get_src_status,
         get_timelocks,
-        get_deployed_at,
+        get_timelocks_value,
         get_src_id,
         extract_src_balances,
         src_sui_balance_value,

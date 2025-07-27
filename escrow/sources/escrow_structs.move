@@ -2,27 +2,13 @@
 module escrow::structs;
 
     use std::string::String;
-    use sui::balance::Balance;
-    use sui::balance::withdraw_all;
-    use sui::balance::split;
+    use sui::balance::{Balance, split, withdraw_all, destroy_zero};
     use sui::sui::SUI;
-    use escrow::constants::status_active;
+    use escrow::constants::{status_active, error_secret_already_used};
 
 // ============ Core Structs ============
 
-    /// Timelocks configuration
-    public struct Timelocks has copy, drop, store {
-        deployed_at: u64,
-        src_withdrawal: u32,
-        src_public_withdrawal: u32,
-        src_cancellation: u32,
-        src_public_cancellation: u32,
-        dst_withdrawal: u32,
-        dst_public_withdrawal: u32,
-        dst_cancellation: u32,
-    }
-
-    /// Core immutable parameters for an escrow
+    /// Core immutable parameters for escrow operations
     public struct EscrowImmutables has copy, drop, store {
         order_hash: vector<u8>,      // 32 bytes
         hashlock: vector<u8>,        // 32 bytes - keccak256(secret) or merkle root
@@ -34,14 +20,16 @@ module escrow::structs;
         timelocks: Timelocks,
     }
 
-    // Merkle secret tree info for partial fills
-    public struct MerkleSecretInfo has copy, drop, store {
+    /// Merkle secret tree info for partial fills
+    /// protect used indices from replay bugs by omitting copy and drop
+    public struct MerkleSecretInfo has store {
         merkle_root: vector<u8>,     // 32 bytes
         parts_amount: u8,            // Number of parts the order is split into
         used_indices: vector<u8>,    // Indices of used secrets
     }
 
     /// Source chain escrow object - SHARED for consensus
+    /// holds maker tokens
     public struct EscrowSrc<phantom T> has key, store {
         id: UID,
         immutables: EscrowImmutables,
@@ -52,6 +40,7 @@ module escrow::structs;
     }
 
     /// Destination chain escrow object - SHARED for consensus
+    /// holds taker tokens
     public struct EscrowDst<phantom T> has key, store {
         id: UID,
         immutables: EscrowImmutables,
@@ -61,42 +50,29 @@ module escrow::structs;
         merkle_info: MerkleSecretInfo
     }
 
-    /// Access token for public operations
-    public struct AccessToken has key, store {
-        id: UID,
-        created_at: u64,
-    }
-
-    /// Factory for creating escrows - SHARED object
-    public struct EscrowFactory has key {
+    /// Factory state for global configuration
+    public struct AccessFactory has key {
         id: UID,
         rescue_delay: u64,
         access_token_supply: u64,
+        admin: address,
+    }
+
+    /// Access token for public operations with expiration
+    public struct AccessToken has key, store {
+        id: UID,
+        created_at: u64,
+        expires_at: u64,
+        escrow_id: Option<address>,
+        used: bool,
+    }
+
+    /// Timelocks packed into u256
+    public struct Timelocks has store, copy, drop {
+        value: u256,
     }
 
      // ============ Constructor Functions ============
-
-    public fun new_timelocks(
-        deployed_at: u64,
-        src_withdrawal: u32,
-        src_public_withdrawal: u32,
-        src_cancellation: u32,
-        src_public_cancellation: u32,
-        dst_withdrawal: u32,
-        dst_public_withdrawal: u32,
-        dst_cancellation: u32,
-    ): Timelocks {
-        Timelocks {
-            deployed_at,
-            src_withdrawal,
-            src_public_withdrawal,
-            src_cancellation,
-            src_public_cancellation,
-            dst_withdrawal,
-            dst_public_withdrawal,
-            dst_cancellation,
-        }
-    }
 
     public fun new_immutables(
         order_hash: vector<u8>,
@@ -131,17 +107,11 @@ module escrow::structs;
         }
     }
 
-    // ============ Getter Functions ============
+    public fun new_timelocks(value: u256): Timelocks {
+        Timelocks { value }
+    }
 
-    // Timelocks getters
-    public fun get_deployed_at(timelocks: &Timelocks): u64 { timelocks.deployed_at }
-    public fun get_src_withdrawal_time(timelocks: &Timelocks): u32 { timelocks.src_withdrawal }
-    public fun get_src_public_withdrawal_time(timelocks: &Timelocks): u32 { timelocks.src_public_withdrawal }
-    public fun get_src_cancellation_time(timelocks: &Timelocks): u32 { timelocks.src_cancellation }
-    public fun get_src_public_cancellation_time(timelocks: &Timelocks): u32 { timelocks.src_public_cancellation }
-    public fun get_dst_withdrawal_time(timelocks: &Timelocks): u32 { timelocks.dst_withdrawal }
-    public fun get_dst_public_withdrawal_time(timelocks: &Timelocks): u32 { timelocks.dst_public_withdrawal }
-    public fun get_dst_cancellation_time(timelocks: &Timelocks): u32 { timelocks.dst_cancellation }
+    // ============ Getter Functions ============
 
     // EscrowImmutables getters
     public fun get_order_hash(immutables: &EscrowImmutables): &vector<u8> { &immutables.order_hash }
@@ -175,17 +145,19 @@ module escrow::structs;
     public fun get_dst_merkle_info<T>(escrow: &EscrowDst<T>): &MerkleSecretInfo { &escrow.merkle_info }
 
     // Factory getters
-    public fun get_rescue_delay(factory: &EscrowFactory): u64 { factory.rescue_delay }
-    public fun get_access_token_supply(factory: &EscrowFactory): u64 { factory.access_token_supply }
+    public fun get_rescue_delay(factory: &AccessFactory): u64 { factory.rescue_delay }
+    public fun get_access_token_supply(factory: &AccessFactory): u64 { factory.access_token_supply }
+    public fun get_admin(factory: &AccessFactory): address { factory.admin }
 
     // Access token getter
-    public fun get_access_token_created_at(access_token: &AccessToken): u64 { access_token.created_at}
+    public fun get_access_token_created_at(access_token: &AccessToken): u64 { access_token.created_at }
+    public fun get_access_token_expires_at(access_token: &AccessToken): u64 { access_token.expires_at }
+    public fun get_access_token_escrow_id(access_token: &AccessToken): &Option<address> { &access_token.escrow_id }
+    public fun is_access_token_used(access_token: &AccessToken): bool { access_token.used }
+    public fun get_access_token_address(tok: &AccessToken): address { object::uid_to_address(&tok.id) }
 
-    public fun get_access_token_address(tok: &AccessToken): address {
-    object::uid_to_address(&tok.id)   // legal here; we own the struct
-    }
-
-
+    // Timelocks getter
+    public fun get_timelocks_value(timelocks: &Timelocks): u256 { timelocks.value }
 
     // ============ Escrow Creation Functions ============
 
@@ -228,11 +200,16 @@ module escrow::structs;
     // AccessToken setter
     public(package) fun new_access_token(
         created_at: u64,
+        expires_at: u64,
+        escrow_id: Option<address>,
         ctx: &mut TxContext
     ): AccessToken {
         AccessToken {
             id: object::new(ctx),
             created_at,
+            expires_at,
+            escrow_id,
+            used: false,
         }
     }
 
@@ -246,6 +223,10 @@ module escrow::structs;
     // EscrowDst status setter
     public(package) fun set_dst_status<T>(escrow: &mut EscrowDst<T>, status: u8) {
         escrow.status = status;
+    }
+
+    public(package) fun mark_access_token_used(token: &mut AccessToken) {
+        token.used = true;
     }
 
     // ============ Balance Extraction Functions ============
@@ -286,7 +267,8 @@ module escrow::structs;
         (token_balance, sui_balance)
     }
 
-    // ── escrow balances ───────────────────────────────────────────
+    // ============ Balance Value Functions ============
+
     public fun src_token_balance_value<T>(escrow: &EscrowSrc<T>): u64 {
         sui::balance::value(&escrow.token_balance)
     }
@@ -302,6 +284,7 @@ module escrow::structs;
     public fun dst_sui_balance_value<T>(escrow: &EscrowDst<T>): u64 {
         sui::balance::value(&escrow.sui_balance)
     }
+
     // ============ Merkle Info Functions ============
 
     public(package) fun get_merkle_info_mut<T>(escrow: &mut EscrowSrc<T>): &mut MerkleSecretInfo {
@@ -314,17 +297,88 @@ module escrow::structs;
 
     /// Mark a secret index as used
     public(package) fun mark_secret_used(merkle_info: &mut MerkleSecretInfo, index: u64) {
+        // Check if already used before marking
+        assert!(!is_secret_index_used(merkle_info, index), error_secret_already_used());
         vector::push_back(&mut merkle_info.used_indices, index as u8);
+    }
+
+    /// Check if a secret index has been used
+    public fun is_secret_index_used(merkle_info: &MerkleSecretInfo, index: u64): bool {
+        let used_indices = &merkle_info.used_indices;
+        let mut i = 0;
+        let len = vector::length(used_indices);
+        while (i < len) {
+            if (*vector::borrow(used_indices, i) as u64 == index) {
+                return true
+            };
+            i = i + 1;
+        };
+        false
     }
 
     // ============ Factory State Functions ============
 
-    public(package) fun increment_access_token_supply(factory: &mut EscrowFactory) {
+    public(package) fun increment_access_token_supply(factory: &mut AccessFactory) {
         factory.access_token_supply = factory.access_token_supply + 1;
     }
 
-    public(package) fun update_rescue_delay(factory: &mut EscrowFactory, new_delay: u64) {
+    public(package) fun update_rescue_delay(factory: &mut AccessFactory, new_delay: u64) {
         factory.rescue_delay = new_delay;
+    }
+
+    public(package) fun set_factory_admin(factory: &mut AccessFactory, new_admin: address) {
+        factory.admin = new_admin;
+    }
+
+    // ============ Object Cleanup Functions ============
+
+    /// Clean up completed source escrow
+    public(package) fun cleanup_src_escrow<T>(escrow: EscrowSrc<T>) {
+        let EscrowSrc { 
+            id, 
+            immutables: _, 
+            token_balance, 
+            sui_balance, 
+            status: _, 
+            merkle_info, 
+        } = escrow;
+        
+        // Destroy empty balances
+        destroy_zero(token_balance);
+        destroy_zero(sui_balance);
+        destroy_merkle_info(merkle_info);
+        
+        // Delete the object
+        object::delete(id);
+    }
+
+    /// Clean up completed destination escrow
+    public(package) fun cleanup_dst_escrow<T>(escrow: EscrowDst<T>) {
+        let EscrowDst { 
+            id, 
+            immutables: _, 
+            token_balance, 
+            sui_balance, 
+            status: _, 
+            merkle_info 
+        } = escrow;
+        
+        // Destroy empty balances
+        destroy_zero(token_balance);
+        destroy_zero(sui_balance);
+        destroy_merkle_info(merkle_info);
+        
+        // Delete the object
+        object::delete(id);
+    }
+
+    /// Consume and destroy MerkleSecretInfo explicitly.
+    public(package) fun destroy_merkle_info(info: MerkleSecretInfo) {
+    let MerkleSecretInfo {
+        merkle_root: _,                    // ok to drop
+        parts_amount:_,
+        used_indices:_,          // vector by defauly 
+    } = info;
     }
 
 
