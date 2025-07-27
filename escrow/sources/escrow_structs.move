@@ -290,6 +290,13 @@ module escrow::structs;
         sui::balance::value(&escrow.token_balance)
     }
 
+    public fun src_sui_balance_value<T>(escrow: &EscrowSrc<T>): u64 {
+        sui::balance::value(&escrow.sui_balance)
+    }
+
+    public fun dst_sui_balance_value<T>(escrow: &EscrowDst<T>): u64 {
+        sui::balance::value(&escrow.sui_balance)
+    }
     // ============ Merkle Info Functions ============
 
     public(package) fun get_merkle_info_mut<T>(escrow: &mut EscrowSrc<T>): &mut MerkleSecretInfo {

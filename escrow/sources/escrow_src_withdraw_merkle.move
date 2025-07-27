@@ -243,7 +243,7 @@ module escrow::escrow_src_withdraw_merkle;
     }
 
     /// Get list of used secret indices
-    public fun view_used_indices<T>(escrow: &EscrowSrc<T>): &vector<u8> {
+    public fun get_used_indices_src<T>(escrow: &EscrowSrc<T>): &vector<u8> {
         let merkle_info = get_src_merkle_info(escrow);
         get_used_indices(merkle_info)
     }
