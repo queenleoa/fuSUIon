@@ -39,6 +39,7 @@ module escrow::constants;
     public fun status_active(): u8 { 0 }
     public fun status_withdrawn(): u8 { 1 }
     public fun status_cancelled(): u8 { 2 }
+    public fun status_rescued(): u8 { 3 }
 
     // ============ Time Constants ============
     
