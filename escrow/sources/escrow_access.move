@@ -78,60 +78,60 @@ module escrow::escrow_access;
     // ============ Init Function ============
 
     fun init(ctx: &mut TxContext) {
-        // Create admin capability
-        let admin_cap = AdminCap {
-            id: object::new(ctx)
-        };
-        transfer::transfer(admin_cap, ctx.sender());
-
-        // Create relayer capability
-        let relayer_cap = RelayerCap {
-            id: object::new(ctx)
-        };
-        transfer::transfer(relayer_cap, ctx.sender());
+    // Create admin capability. Init once when published. 
+    let admin_cap = AdminCap {
+        id: object::new(ctx)
+    };
+    transfer::transfer(admin_cap, ctx.sender());
+    
+    // Create relayer capability  
+    let relayer_cap = RelayerCap {
+        id: object::new(ctx)
+    };
+    transfer::transfer(relayer_cap, ctx.sender());
     }
+
 
     // ============ Access Token Management ============
 
     /// Mint access token for a whitelisted resolver (admin only)
-    public fun mint_access_token(
-        _: &AdminCap,
+    // Mint an access token for a whitelisted resolver
+    /// Only admin can mint access tokens
+    public entry fun mint_access_token(
+        _admin_cap: &AdminCap,
         resolver: address,
         validity_period: u64,
         clock: &Clock,
         ctx: &mut TxContext
-    ): AccessToken {
-        let token = create_access_token(
+    ) {
+        // Create access token
+        let access_token = structs::create_access_token(
             resolver,
             validity_period,
             clock,
             ctx
         );
-
+        
+        let token_id = structs::get_token_address(&access_token);
+        let expires_at = structs::get_token_expires_at(&access_token);
+        
+        // Transfer access token to resolver
+        transfer::public_transfer(access_token, resolver);
+        
         // Emit event
         event::emit(AccessTokenMinted {
-            token_id: structs::get_token_address(&token),
-            resolver: structs::get_token_resolver(&token),
-            minted_at: structs::get_token_minted_at(&token),
-            expires_at: structs::get_token_expires_at(&token),
+            resolver,
+            token_id,
+            timestamp: timestamp_ms(clock) / 1000,
+            admin: ctx.sender(),
+            expires_at
         });
+    }   
 
-        token
-    }
 
-    /// Mint access token with default validity period
-    public fun mint_access_token_default(
-        admin_cap: &AdminCap,
-        resolver: address,
-        clock: &Clock,
-        ctx: &mut TxContext
-    ): AccessToken {
-        mint_access_token(admin_cap, resolver, default_token_validity(), clock, ctx)
-    }
-
-    /// Grant relayer capability to an address (admin only)
-    public fun grant_relayer_capability(
-        _: &AdminCap,
+   /// Grant relayer capability to an address (admin only)
+    public entry fun grant_relayer_capability(
+        _admin_cap: &AdminCap,
         recipient: address,
         ctx: &mut TxContext
     ) {
@@ -141,72 +141,12 @@ module escrow::escrow_access;
         transfer::transfer(relayer_cap, recipient);
     }
 
-    /// Check if access token is valid
-    public fun validate_access_token(
-        token: &AccessToken,
-        resolver: address,
-        clock: &Clock
-    ): bool {
-        utils::validate_access_token(token, resolver, clock)
-    }
-
     // ============ User Intent Verification ============
 
-    /// Verify user intent with Ed25519 signature (Sui native)
-    public fun verify_user_intent_ed25519(
-        order_hash: vector<u8>,
-        maker: address,
-        resolver: address,
-        action: u8,
-        expiry: u64,
-        nonce: u64,
-        signature: vector<u8>,
-        public_key: vector<u8>,
-        clock: &Clock
-    ): bool {
-        // Check expiry
-        let current_time = timestamp_ms(clock) / 1000;
-        if (current_time >= expiry) {
-            return false
-        };
-
-        // Create intent message
-        let intent = structs::create_user_intent {
-            order_hash,
-            resolver,
-            action,
-            expiry,
-            nonce,
-        };
-
-        // Serialize intent with Sui prefix
-        let message = constants::create_sui_intent_message(bcs::to_bytes(&intent));
-
-        // Verify signature
-        let verified = ed25519::ed25519_verify(
-            &signature,
-            &public_key,
-            &message
-        );
-
-        if (verified) {
-            // Emit verification event
-            event::emit(UserIntentVerified {
-                order_hash,
-                maker,
-                resolver,
-                action,
-                verified_at: current_time,
-            });
-        };
-
-        verified
-    }
-
-    /// Verify user intent with secp256k1 signature (EVM compatible)
+    /// Verify user intent using secp256k1 (EVM compatible)
     public fun verify_user_intent_secp256k1(
         order_hash: vector<u8>,
-        maker: address,
+        user: address,
         resolver: address,
         action: u8,
         expiry: u64,
@@ -214,50 +154,72 @@ module escrow::escrow_access;
         signature: vector<u8>,
         clock: &Clock
     ): bool {
-        // Check expiry
         let current_time = timestamp_ms(clock) / 1000;
-        if (current_time >= expiry) {
-            return false
-        };
-
-        // Create intent message
-        let intent = structs::create_user_intent {
+        
+        // Check expiration
+        assert!(current_time < expiry, error_invalid_time());
+        
+        // Create user intent
+        let intent = structs::create_user_intent(
             order_hash,
             resolver,
             action,
+            current_time,
             expiry,
-            nonce,
-        };
-
-        // Serialize intent
+            nonce
+        );
+        
+        // Create message and hash it
         let message = bcs::to_bytes(&intent);
-        let msg_hash = sui::hash::keccak256(&message);
-
-        // Recover signer address from signature
+        let msg_hash = keccak256(&message);
+        
+        // Verify signature (assuming signature contains r, s, v)
+        assert!(vector::length(&signature) == 65, error_invalid_intent_signature());
+        
+        // Extract v from last byte
+        let v = *vector::borrow(&signature, 64);
+        let recovery_id = if (v >= 27) { v - 27 } else { v };
+        
+        // Recover public key
         let recovered_pubkey = ecdsa_k1::secp256k1_ecrecover(
             &signature,
             &msg_hash,
-            0 // recovery_id (v - 27)
+            recovery_id
         );
-
-        // Derive address from public key
-        let recovered_address = ecdsa_k1::secp256k1_pubkey_to_address(&recovered_pubkey);
-
-        let verified = recovered_address == maker;
-
+        
+        // Derive address from recovered public key
+        let derived_address = ecdsa_k1::secp256k1_pubkey_to_address(&recovered_pubkey);
+        
+        let verified = derived_address == user;
+        
         if (verified) {
             // Emit verification event
             event::emit(UserIntentVerified {
+                user,
                 order_hash,
-                maker,
-                resolver,
                 action,
-                verified_at: current_time,
+                resolver,
+                timestamp: current_time
             });
         };
-
+        
         verified
+    }nonce: u64,
+        signature: vector<u8>
+    ): SignedUserIntent {
+        SignedUserIntent {
+            user,
+            order_hash,
+            amount,
+            src_token,
+            dst_token,
+            chain_id,
+            expiration,
+            nonce,
+            signature
+        }
     }
+
 
     // ============ OrderState Management ============
 

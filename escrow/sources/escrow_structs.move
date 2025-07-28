@@ -391,7 +391,7 @@ module escrow::structs;
         let resolver_fill = vector::pop_back(&mut fills);
         destroy_resolver_fill(resolver_fill);
         };
-        vector::destroy_empty(resolver_fills);
+        vector::destroy_empty(fills);
         object::delete(id);
     }
 

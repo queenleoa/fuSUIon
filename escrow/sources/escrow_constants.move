@@ -4,33 +4,33 @@ module escrow::constants;
 // ============ Error Constants ============
 
     /// Error codes for escrow operations (using u8 for efficiency)
-    public fun error_invalid_secret(): u8 { 1 }
-    public fun error_invalid_timelock(): u8 { 2 }
-    public fun error_already_withdrawn(): u8 { 3 }
-    public fun error_already_cancelled(): u8 { 4 }
-    public fun error_not_authorized(): u8 { 5 }
-    public fun error_insufficient_balance(): u8 { 6 }
-    public fun error_invalid_status(): u8 { 7 }
-    public fun error_secret_already_used(): u8 { 8 }
-    public fun error_invalid_merkle_proof(): u8 { 9 }
-    public fun error_invalid_partial_fill(): u8 { 10 }
-    public fun error_invalid_escrow_params(): u8 { 11 }
-    public fun error_invalid_access_token(): u8 { 12 }
-    public fun error_timelock_not_expired(): u8 { 13 }
-    public fun error_invalid_order_hash(): u8 { 14 }
-    public fun error_invalid_amount(): u8 { 15 }
-    public fun error_invalid_safety_deposit(): u8 { 16 }
-    public fun error_escrow_not_active(): u8 { 17 }
-    public fun error_invalid_merkle_index(): u8 { 18 }
-    public fun error_invalid_intent_signature(): u8 { 19 }
-    public fun error_resolver_not_whitelisted(): u8 { 20 }
-    public fun error_invalid_caller(): u8 { 21 }
-    public fun error_invalid_time(): u8 { 22 }
-    public fun error_token_expired(): u8 { 23 }
-    public fun error_invalid_immutables(): u8 { 24 }
-    public fun error_invalid_secrets_amount(): u8 { 25 }
-    public fun error_invalid_creation_time(): u8 { 26 }
-    public fun error_invalid_resolber(): u8 { 27 }
+    public fun error_invalid_secret(): u64 { 1 }
+    public fun error_invalid_timelock(): u64 { 2 }
+    public fun error_already_withdrawn(): u64 { 3 }
+    public fun error_already_cancelled(): u64 { 4 }
+    public fun error_not_authorized(): u64 { 5 }
+    public fun error_insufficient_balance(): u64 { 6 }
+    public fun error_invalid_status(): u64 { 7 }
+    public fun error_secret_already_used(): u64 { 8 }
+    public fun error_invalid_merkle_proof(): u64 { 9 }
+    public fun error_invalid_partial_fill(): u64 { 10 }
+    public fun error_invalid_escrow_params(): u64 { 11 }
+    public fun error_invalid_access_token(): u64 { 12 }
+    public fun error_timelock_not_expired(): u64 { 13 }
+    public fun error_invalid_order_hash(): u64 { 14 }
+    public fun error_invalid_amount(): u64 { 15 }
+    public fun error_invalid_safety_deposit(): u64 { 16 }
+    public fun error_escrow_not_active(): u64 { 17 }
+    public fun error_invalid_merkle_index(): u64 { 18 }
+    public fun error_invalid_intent_signature(): u64 { 19 }
+    public fun error_resolver_not_whitelisted(): u64 { 20 }
+    public fun error_invalid_caller(): u64 { 21 }
+    public fun error_invalid_time(): u64 { 22 }
+    public fun error_token_expired(): u64 { 23 }
+    public fun error_invalid_immutables(): u64 { 24 }
+    public fun error_invalid_secrets_amount(): u64 { 25 }
+    public fun error_invalid_creation_time(): u64 { 26 }
+    public fun error_invalid_resolver(): u64 { 27 }
 
 
 // ============ Status Constants ============
