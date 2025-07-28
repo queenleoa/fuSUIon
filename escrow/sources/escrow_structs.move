@@ -115,12 +115,14 @@ module escrow::structs;
     public fun get_dst_cancellation_time(timelocks: &Timelocks): u64 { timelocks.dst_cancellation }
 
     // EscrowSrc getters
+    public fun get_src_address<T>(escrow: &EscrowSrc<T>): address { object::uid_to_address(&escrow.id) }
     public fun get_src_immutables<T>(escrow: &EscrowSrc<T>): &EscrowImmutables { &escrow.immutables }
     public fun get_src_token_balance<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.token_balance) }
     public fun get_src_safety_deposit<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.safety_deposit) }
     public fun get_src_status<T>(escrow: &EscrowSrc<T>): u8 { escrow.status }
 
     // EscrowDst getters
+    public fun get_dst_address<T>(escrow: &EscrowDst<T>): address { object::uid_to_address(&escrow.id) }
     public fun get_dst_immutables<T>(escrow: &EscrowDst<T>): &EscrowImmutables { &escrow.immutables }
     public fun get_dst_token_balance<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.token_balance) }
     public fun get_dst_safety_deposit<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.safety_deposit) }
@@ -128,16 +130,20 @@ module escrow::structs;
 
 
     // OrderState getters
-    public fun get_order_state_hash(state: &OrderState): &vector<u8> { &state.order_hash }
-    public fun get_order_merkle_root(state: &OrderState): &vector<u8> { &state.merkle_root }
-    public fun get_total_amount(state: &OrderState): u64 { state.total_amount }
-    public fun get_filled_amount(state: &OrderState): u64 { state.filled_amount }
-    public fun get_order_parts_amount(state: &OrderState): u8 { state.parts_amount }
-    public fun get_used_indices(state: &OrderState): &vector<u8> { &state.used_indices }
+    public fun get_order_state_address(state: &OrderState): address { object::uid_to_address(&state.id) }
+    public fun get_order_state_order_hash(state: &OrderState): &vector<u8> { &state.order_hash }
+    public fun get_order_state_merkle_root(state: &OrderState): &vector<u8> { &state.merkle_root }
+    public fun get_order_state_total_amount(state: &OrderState): u64 { state.total_amount }
+    public fun get_order_state_filled_amount(state: &OrderState): u64 { state.filled_amount }
+    public fun get_order_state_parts_amount(state: &OrderState): u8 { state.parts_amount }
+    public fun get_order_state_used_indices(state: &OrderState): &vector<u8> { &state.used_indices }
+    public fun get_order_state_resolver_fills(state: &OrderState): &vector<ResolverFill> { &state.resolver_fills }
 
     // AccessToken getters
+    public fun get_token_address(token: &AccessToken): address { object::uid_to_address(&token.id) }
     public fun get_token_resolver(token: &AccessToken): address { token.resolver }
-    public fun get_token_expiry(token: &AccessToken): u64 { token.expires_at }
+    public fun get_token_minted_at(token: &AccessToken): u64 { token.minted_at }
+    public fun get_token_expires_at(token: &AccessToken): u64 { token.expires_at }
 
 
     // ============ Constructor Functions ============
