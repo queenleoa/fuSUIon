@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_src_rescue;
+/*module escrow::escrow_src_rescue;
 
     use sui::coin::{Self, Coin};
     use sui::balance;
@@ -140,3 +140,4 @@ module escrow::escrow_src_rescue;
         let deployed_at = get_deployed_at(get_timelocks(immutables));
         deployed_at + rescue_delay
     }
+    */

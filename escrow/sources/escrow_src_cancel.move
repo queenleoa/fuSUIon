@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_src_cancel;
+/*module escrow::escrow_src_cancel;
 
     use sui::coin::{Self, Coin};
     use sui::clock::{Self, Clock};
@@ -78,17 +78,17 @@ module escrow::escrow_src_cancel;
         escrow: &mut EscrowSrc<T>,
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
-        /* ── 1- Grab data we’ll still need after mutation ─────────────── */
+        // ── 1- Grab data we’ll still need after mutation ─────────────── 
         let maker      = get_maker(get_src_immutables(escrow));
         let src_id     = get_src_id(escrow);
 
-    /* ── 2- Mutate escrow (requires &mut) ─────────────────────────── */
+    // ── 2- Mutate escrow (requires &mut) ─────────────────────────── 
         set_src_status(escrow, status_cancelled());
 
         let (token_balance, sui_balance) = extract_src_balances(escrow);
 
-    /* ── 3- Emit event (immutable borrow is allowed again; the prior
-           &mut borrow ended when `extract_src_balances` returned) ─── */
+    // ── 3- Emit event (immutable borrow is allowed again; the prior
+           &mut borrow ended when `extract_src_balances` returned) ─── 
         events::emit_escrow_cancelled(
             src_id,
             maker,

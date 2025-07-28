@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_dst_create;
+/* module escrow::escrow_dst_create;
 
     use sui::coin::{Self, Coin};
     use sui::sui::SUI;
@@ -139,5 +139,6 @@ module escrow::escrow_dst_create;
             get_safety_deposit(immutables)
         )
     }
+    */
 
 

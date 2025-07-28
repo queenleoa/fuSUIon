@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_dst_rescue;
+/* module escrow::escrow_dst_rescue;
 
 use sui::coin::{Self, Coin};
     use sui::balance;

@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_dst_cancel;
+/*module escrow::escrow_dst_cancel;
 
 use sui::coin::{Self, Coin};
     use sui::balance;
@@ -53,17 +53,16 @@ use sui::coin::{Self, Coin};
         escrow: &mut EscrowDst<T>,
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
-        /* ── 1- Grab data we'll still need after mutation ─────────────── */
+        // ── 1- Grab data we'll still need after mutation ─────────────── 
         let taker = get_taker(get_dst_immutables(escrow));
         let dst_id = get_dst_id(escrow);
 
-        /* ── 2- Mutate escrow (requires &mut) ─────────────────────────── */
+        // ── 2- Mutate escrow (requires &mut) ─────────────────────────── 
         set_dst_status(escrow, status_cancelled());
 
         let (token_balance, sui_balance) = extract_dst_balances(escrow);
 
-        /* ── 3- Emit event (immutable borrow is allowed again; the prior
-               &mut borrow ended when `extract_dst_balances` returned) ─── */
+        // ── 3- Emit event (immutable borrow is allowed again; the prior &mut borrow ended when `extract_dst_balances` returned) ───
         events::emit_escrow_cancelled(
             dst_id,
             taker, // Refund to taker

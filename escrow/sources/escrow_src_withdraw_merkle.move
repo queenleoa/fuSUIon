@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_src_withdraw_merkle;
+/*module escrow::escrow_src_withdraw_merkle;
 
     use sui::coin::{Self, Coin};
     use sui::clock::{Self, Clock};
@@ -139,12 +139,12 @@ module escrow::escrow_src_withdraw_merkle;
         target: address,
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
-        /* ── 1️⃣  Read-only data FIRST (short borrows) ─────────── */
+        // ── 1️⃣  Read-only data FIRST (short borrows) ─────────── 
     let total_amount  = get_amount(get_src_immutables(escrow));
     let parts_amount  = get_parts_amount(get_src_merkle_info(escrow)) as u64;
     let safety_deposit = get_safety_deposit(get_src_immutables(escrow));
 
-    /* ── 2️⃣  Mutate once references are gone ──────────────── */
+    // ── 2️⃣  Mutate once references are gone ──────────────── 
     mark_secret_used(get_merkle_info_mut(escrow), secret_index);
 
     let fill_amount = calculate_partial_fill_amount(
@@ -154,17 +154,17 @@ module escrow::escrow_src_withdraw_merkle;
         safety_deposit, fill_amount, total_amount
     );
 
-    /* ── 3️⃣  Move tokens/SUI out of the escrow ─────────────── */
+    // ── 3️⃣  Move tokens/SUI out of the escrow ─────────────── 
     let (token_bal, sui_bal) = extract_proportional_src_balances(
         escrow, fill_amount, sui_amount
     );
 
-    /* ── 4️⃣  If everything gone, flip status ──────────────── */
+    // ── 4️⃣  If everything gone, flip status ──────────────── 
     if (src_token_balance_value(escrow) == 0) {
         set_src_status(escrow, status_withdrawn());
     };
 
-    /* ── 5️⃣  Emit & return ────────────────────────────────── */
+    // ── 5️⃣  Emit & return ────────────────────────────────── 
     events::emit_escrow_withdrawn(
         get_src_id(escrow),
         secret,

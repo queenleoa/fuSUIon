@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_src_withdraw;
+/*module escrow::escrow_src_withdraw;
 
     use sui::coin::{Self, Coin};
     use sui::balance;
@@ -219,3 +219,4 @@ module escrow::escrow_src_withdraw;
     public fun get_withdrawal_recipient<T>(escrow: &EscrowSrc<T>): address {
         get_taker(get_src_immutables(escrow))
     }
+*/

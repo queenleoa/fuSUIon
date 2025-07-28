@@ -1,5 +1,5 @@
 /// Module: escrow
-module escrow::escrow_dst_withdraw_merkle;
+/*module escrow::escrow_dst_withdraw_merkle;
 
     use sui::coin::{Self, Coin};
     use sui::clock::{Self, Clock};
@@ -163,16 +163,16 @@ module escrow::escrow_dst_withdraw_merkle;
         secret_index: u64,
         ctx: &mut TxContext
     ): (Coin<T>, Coin<SUI>) {
-         /*── 1️⃣  Grab all read-only data first ───────────────────*/
+         //── 1️⃣  Grab all read-only data first ───────────────────
     let maker          = get_maker(get_dst_immutables(escrow));
     let total_amount   = get_amount(get_dst_immutables(escrow));
     let safety_deposit = get_safety_deposit(get_dst_immutables(escrow));
     let parts_amount   = get_parts_amount(get_dst_merkle_info(escrow)) as u64;
 
-    /*── 2️⃣  Now we’re free to mutate escrow ─────────────────*/
+    //── 2️⃣  Now we’re free to mutate escrow ─────────────────
     mark_secret_used(get_dst_merkle_info_mut(escrow), secret_index);
 
-    /*── 3️⃣  Compute proportional amounts  ───────────────────*/
+    //── 3️⃣  Compute proportional amounts  ───────────────────
     let fill_amount = calculate_partial_fill_amount(
         total_amount, parts_amount, secret_index
     );
@@ -180,17 +180,17 @@ module escrow::escrow_dst_withdraw_merkle;
         safety_deposit, fill_amount, total_amount
     );
 
-    /*── 4️⃣  Pull coins out of the escrow  ───────────────────*/
+    //── 4️⃣  Pull coins out of the escrow  ───────────────────
     let (token_bal, sui_bal) = extract_proportional_dst_balances(
         escrow, fill_amount, sui_amount
     );
 
-    /*── 5️⃣  If nothing left, flip status  ───────────────────*/
+    //── 5️⃣  If nothing left, flip status  ───────────────────
     if (dst_token_balance_value(escrow) == 0) {
         set_dst_status(escrow, status_withdrawn());
     };
 
-    /*── 6️⃣  Emit event & pay maker  ─────────────────────────*/
+    //── 6️⃣  Emit event & pay maker  ─────────────────────────
     events::emit_escrow_withdrawn(
         get_dst_id(escrow),
         secret,
@@ -204,7 +204,7 @@ module escrow::escrow_dst_withdraw_merkle;
         maker
     );
 
-    /*── 7️⃣  Return the SUI safety-deposit to caller ─────────*/
+    //*── 7️⃣  Return the SUI safety-deposit to caller ─────────
     (coin::zero<T>(ctx), coin::from_balance(sui_bal, ctx))
     }
 

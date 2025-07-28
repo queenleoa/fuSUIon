@@ -88,6 +88,7 @@ module escrow::structs;
         order_hash: vector<u8>,
         resolver: address,
         action: u8,                         // 0: create, 1: cancel
+        verified_at: u64,
         expiry: u64,
         nonce: u64,
     }
@@ -256,6 +257,25 @@ module escrow::structs;
             resolver,
             minted_at: current_time,
             expires_at: current_time + validity_period,
+        }
+    }
+
+    /// Create a new UserIntent
+    public(package) fun create_user_intent(
+        order_hash: vector<u8>,
+        resolver: address,
+        action: u8,                         // 0: create, 1: cancel
+        verified_at: u64,
+        expiry: u64,
+        nonce: u64,
+    ): UserIntent {
+        UserIntent{
+        order_hash: order_hash,
+        resolver: resolver,
+        action: action,                         // 0: create, 1: cancel
+        verified_at: verified_at,
+        expiry: expiry,
+        nonce: nonce,
         }
     }
 
