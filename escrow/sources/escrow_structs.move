@@ -95,104 +95,104 @@ module escrow::structs;
     // ============ Getter Functions ============
 
     // EscrowImmutables getters
-    public fun get_order_hash(immutables: &EscrowImmutables): &vector<u8> { &immutables.order_hash }
-    public fun get_hashlock(immutables: &EscrowImmutables): &vector<u8> { &immutables.hashlock }
-    public fun get_maker(immutables: &EscrowImmutables): address { immutables.maker }
-    public fun get_taker(immutables: &EscrowImmutables): address { immutables.taker }
-    public fun get_token_type(immutables: &EscrowImmutables): &String { &immutables.token_type }
-    public fun get_amount(immutables: &EscrowImmutables): u64 { immutables.amount }
-    public fun get_safety_deposit_amount(immutables: &EscrowImmutables): u64 { immutables.safety_deposit_amount }
-    public fun get_resolver(immutables: &EscrowImmutables): address { immutables.resolver }
-    public fun get_timelocks(immutables: &EscrowImmutables): &Timelocks { &immutables.timelocks }
+    public(package) fun get_order_hash(immutables: &EscrowImmutables): &vector<u8> { &immutables.order_hash }
+    public(package) fun get_hashlock(immutables: &EscrowImmutables): &vector<u8> { &immutables.hashlock }
+    public(package) fun get_maker(immutables: &EscrowImmutables): address { immutables.maker }
+    public(package) fun get_taker(immutables: &EscrowImmutables): address { immutables.taker }
+    public(package) fun get_token_type(immutables: &EscrowImmutables): &String { &immutables.token_type }
+    public(package) fun get_amount(immutables: &EscrowImmutables): u64 { immutables.amount }
+    public(package) fun get_safety_deposit_amount(immutables: &EscrowImmutables): u64 { immutables.safety_deposit_amount }
+    public(package) fun get_resolver(immutables: &EscrowImmutables): address { immutables.resolver }
+    public(package) fun get_timelocks(immutables: &EscrowImmutables): &Timelocks { &immutables.timelocks }
 
     // Timelocks getters
-    public fun get_deployed_at(timelocks: &Timelocks): u64 { timelocks.deployed_at }
-    public fun get_src_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_withdrawal }
-    public fun get_src_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_public_withdrawal }
-    public fun get_src_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_cancellation }
-    public fun get_src_public_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_public_cancellation }
-    public fun get_dst_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_withdrawal }
-    public fun get_dst_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_public_withdrawal }
-    public fun get_dst_cancellation_time(timelocks: &Timelocks): u64 { timelocks.dst_cancellation }
+    public(package) fun get_deployed_at(timelocks: &Timelocks): u64 { timelocks.deployed_at }
+    public(package) fun get_src_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_withdrawal }
+    public(package) fun get_src_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_public_withdrawal }
+    public(package) fun get_src_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_cancellation }
+    public(package) fun get_src_public_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_public_cancellation }
+    public(package) fun get_dst_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_withdrawal }
+    public(package) fun get_dst_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_public_withdrawal }
+    public(package) fun get_dst_cancellation_time(timelocks: &Timelocks): u64 { timelocks.dst_cancellation }
 
     // EscrowSrc getters
-    public fun get_src_address<T>(escrow: &EscrowSrc<T>): address { object::uid_to_address(&escrow.id) }
-    public fun get_src_immutables<T>(escrow: &EscrowSrc<T>): &EscrowImmutables { &escrow.immutables }
-    public fun get_src_token_balance<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.token_balance) }
-    public fun get_src_safety_deposit<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.safety_deposit) }
-    public fun get_src_status<T>(escrow: &EscrowSrc<T>): u8 { escrow.status }
+    public(package) fun get_src_address<T>(escrow: &EscrowSrc<T>): address { object::uid_to_address(&escrow.id) }
+    public(package) fun get_src_immutables<T>(escrow: &EscrowSrc<T>): &EscrowImmutables { &escrow.immutables }
+    public(package) fun get_src_token_balance<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.token_balance) }
+    public(package) fun get_src_safety_deposit<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.safety_deposit) }
+    public(package) fun get_src_status<T>(escrow: &EscrowSrc<T>): u8 { escrow.status }
 
     // EscrowDst getters
-    public fun get_dst_address<T>(escrow: &EscrowDst<T>): address { object::uid_to_address(&escrow.id) }
-    public fun get_dst_immutables<T>(escrow: &EscrowDst<T>): &EscrowImmutables { &escrow.immutables }
-    public fun get_dst_token_balance<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.token_balance) }
-    public fun get_dst_safety_deposit<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.safety_deposit) }
-    public fun get_dst_status<T>(escrow: &EscrowDst<T>): u8 { escrow.status }
+    public(package) fun get_dst_address<T>(escrow: &EscrowDst<T>): address { object::uid_to_address(&escrow.id) }
+    public(package) fun get_dst_immutables<T>(escrow: &EscrowDst<T>): &EscrowImmutables { &escrow.immutables }
+    public(package) fun get_dst_token_balance<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.token_balance) }
+    public(package) fun get_dst_safety_deposit<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.safety_deposit) }
+    public(package) fun get_dst_status<T>(escrow: &EscrowDst<T>): u8 { escrow.status }
 
 
     // OrderState getters
-    public fun get_order_state_address(state: &OrderState): address { object::uid_to_address(&state.id) }
-    public fun get_order_state_order_hash(state: &OrderState): &vector<u8> { &state.order_hash }
-    public fun get_order_state_merkle_root(state: &OrderState): &vector<u8> { &state.merkle_root }
-    public fun get_order_state_total_amount(state: &OrderState): u64 { state.total_amount }
-    public fun get_order_state_filled_amount(state: &OrderState): u64 { state.filled_amount }
-    public fun get_order_state_parts_amount(state: &OrderState): u8 { state.parts_amount }
-    public fun get_order_state_used_indices(state: &OrderState): &vector<u8> { &state.used_indices }
-    public fun get_order_state_resolver_fills(state: &OrderState): &vector<ResolverFill> { &state.resolver_fills }
+    public(package) fun get_order_state_address(state: &OrderState): address { object::uid_to_address(&state.id) }
+    public(package) fun get_order_state_order_hash(state: &OrderState): &vector<u8> { &state.order_hash }
+    public(package) fun get_order_state_merkle_root(state: &OrderState): &vector<u8> { &state.merkle_root }
+    public(package) fun get_order_state_total_amount(state: &OrderState): u64 { state.total_amount }
+    public(package) fun get_order_state_filled_amount(state: &OrderState): u64 { state.filled_amount }
+    public(package) fun get_order_state_parts_amount(state: &OrderState): u8 { state.parts_amount }
+    public(package) fun get_order_state_used_indices(state: &OrderState): &vector<u8> { &state.used_indices }
+    public(package) fun get_order_state_resolver_fills(state: &OrderState): &vector<ResolverFill> { &state.resolver_fills }
 
     // AccessToken getters
-    public fun get_token_address(token: &AccessToken): address { object::uid_to_address(&token.id) }
-    public fun get_token_resolver(token: &AccessToken): address { token.resolver }
-    public fun get_token_minted_at(token: &AccessToken): u64 { token.minted_at }
-    public fun get_token_expires_at(token: &AccessToken): u64 { token.expires_at }
+    public(package) fun get_token_address(token: &AccessToken): address { object::uid_to_address(&token.id) }
+    public(package) fun get_token_resolver(token: &AccessToken): address { token.resolver }
+    public(package) fun get_token_minted_at(token: &AccessToken): u64 { token.minted_at }
+    public(package) fun get_token_expires_at(token: &AccessToken): u64 { token.expires_at }
 
     // ============ Setter/Mutator Functions ============
 
     // Escrow status mutators
-    public fun set_src_status<T>(escrow: &mut EscrowSrc<T>, status: u8) {
+    public(package) fun set_src_status<T>(escrow: &mut EscrowSrc<T>, status: u8) {
         escrow.status = status;
     }
 
-    public fun set_dst_status<T>(escrow: &mut EscrowDst<T>, status: u8) {
+    public(package) fun set_dst_status<T>(escrow: &mut EscrowDst<T>, status: u8) {
         escrow.status = status;
     }
 
     // OrderState mutators
-    public fun update_order_state_filled_amount(state: &mut OrderState, amount: u64) {
+    public(package) fun update_order_state_filled_amount(state: &mut OrderState, amount: u64) {
         state.filled_amount = state.filled_amount + amount;
     }
 
-    public fun add_order_state_used_index(state: &mut OrderState, index: u8) {
+    public(package) fun add_order_state_used_index(state: &mut OrderState, index: u8) {
         vector::push_back(&mut state.used_indices, index);
     }
 
-    public fun add_order_state_resolver_fill(state: &mut OrderState, fill: ResolverFill) {
+    public(package) fun add_order_state_resolver_fill(state: &mut OrderState, fill: ResolverFill) {
         vector::push_back(&mut state.resolver_fills, fill);
     }
 
     // ============ Balance Operations ============
 
     // Extract balances for withdrawals
-    public fun extract_src_tokens<T>(escrow: &mut EscrowSrc<T>): Balance<T> {
+    public(package) fun extract_src_tokens<T>(escrow: &mut EscrowSrc<T>): Balance<T> {
         withdraw_all(&mut escrow.token_balance)
     }
 
-    public fun extract_src_safety_deposit<T>(escrow: &mut EscrowSrc<T>): Balance<SUI> {
+    public(package) fun extract_src_safety_deposit<T>(escrow: &mut EscrowSrc<T>): Balance<SUI> {
         withdraw_all(&mut escrow.safety_deposit)
     }
 
-    public fun extract_dst_tokens<T>(escrow: &mut EscrowDst<T>): Balance<T> {
+    public(package) fun extract_dst_tokens<T>(escrow: &mut EscrowDst<T>): Balance<T> {
         withdraw_all(&mut escrow.token_balance)
     }
 
-    public fun extract_dst_safety_deposit<T>(escrow: &mut EscrowDst<T>): Balance<SUI> {
+    public(package) fun extract_dst_safety_deposit<T>(escrow: &mut EscrowDst<T>): Balance<SUI> {
         withdraw_all(&mut escrow.safety_deposit)
     }
 
     // ============ Constructor Functions for Keyed Structs ============
 
     /// Create a new EscrowSrc object
-    public fun create_escrow_src<T>(
+    public(package) fun create_escrow_src<T>(
         immutables: EscrowImmutables,
         token_balance: Balance<T>,
         safety_deposit: Balance<SUI>,
@@ -208,7 +208,7 @@ module escrow::structs;
     }
 
     /// Create a new EscrowDst object
-    public fun create_escrow_dst<T>(
+    public(package) fun create_escrow_dst<T>(
         immutables: EscrowImmutables,
         token_balance: Balance<T>,
         safety_deposit: Balance<SUI>,
@@ -224,7 +224,7 @@ module escrow::structs;
     }
 
     /// Create a new OrderState object
-    public fun create_order_state(
+    public(package) fun create_order_state(
         order_hash: vector<u8>,
         merkle_root: vector<u8>,
         total_amount: u64,
@@ -244,7 +244,7 @@ module escrow::structs;
     }
 
     /// Create a new AccessToken object
-    public fun create_access_token(
+    public(package) fun create_access_token(
         resolver: address,
         validity_period: u64,
         clock: &Clock,
@@ -261,7 +261,7 @@ module escrow::structs;
 
     // ============ Constructor Functions ============
 
-    public fun create_escrow_immutables(
+    public(package) fun create_escrow_immutables(
         order_hash: vector<u8>,
         hashlock: vector<u8>,
         maker: address,
@@ -285,7 +285,7 @@ module escrow::structs;
         }
     }
 
-    public fun create_timelocks(
+    public(package) fun create_timelocks(
         deployed_at: u64,
         src_withdrawal: u64,
         src_public_withdrawal: u64,
@@ -307,7 +307,7 @@ module escrow::structs;
         }
     }
 
-    public fun create_resolver_fill(
+    public(package) fun create_resolver_fill(
         resolver: address,
         filled_amount: u64,
         indices_used: vector<u8>,
