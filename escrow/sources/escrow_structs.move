@@ -2,9 +2,10 @@
 module escrow::structs;
 
     use std::string::String;
-    use sui::balance::{Balance, split, withdraw_all, destroy_zero, value};
+    use sui::balance::{Balance, withdraw_all, destroy_zero, value};
     use sui::sui::SUI;
-    use escrow::constants::{status_active, error_secret_already_used};
+    use escrow::constants::{status_active};
+    use sui::clock::{Clock, timestamp_ms};
 
 // ============ Core Structs ============
 
@@ -188,6 +189,76 @@ module escrow::structs;
         withdraw_all(&mut escrow.safety_deposit)
     }
 
+    // ============ Constructor Functions for Keyed Structs ============
+
+    /// Create a new EscrowSrc object
+    public fun create_escrow_src<T>(
+        immutables: EscrowImmutables,
+        token_balance: Balance<T>,
+        safety_deposit: Balance<SUI>,
+        ctx: &mut TxContext,
+    ): EscrowSrc<T> {
+        EscrowSrc {
+            id: object::new(ctx),
+            immutables,
+            token_balance,
+            safety_deposit,
+            status: status_active(),
+        }
+    }
+
+    /// Create a new EscrowDst object
+    public fun create_escrow_dst<T>(
+        immutables: EscrowImmutables,
+        token_balance: Balance<T>,
+        safety_deposit: Balance<SUI>,
+        ctx: &mut TxContext,
+    ): EscrowDst<T> {
+        EscrowDst {
+            id: object::new(ctx),
+            immutables,
+            token_balance,
+            safety_deposit,
+            status: status_active(),
+        }
+    }
+
+    /// Create a new OrderState object
+    public fun create_order_state(
+        order_hash: vector<u8>,
+        merkle_root: vector<u8>,
+        total_amount: u64,
+        parts_amount: u8,
+        ctx: &mut TxContext,
+    ): OrderState {
+        OrderState {
+            id: object::new(ctx),
+            order_hash,
+            merkle_root,
+            total_amount,
+            filled_amount: 0,
+            parts_amount,
+            used_indices: vector::empty(),
+            resolver_fills: vector::empty(),
+        }
+    }
+
+    /// Create a new AccessToken object
+    public fun create_access_token(
+        resolver: address,
+        validity_period: u64,
+        clock: &Clock,
+        ctx: &mut TxContext,
+    ): AccessToken {
+        let current_time = timestamp_ms(clock) / 1000;
+        AccessToken {
+            id: object::new(ctx),
+            resolver,
+            minted_at: current_time,
+            expires_at: current_time + validity_period,
+        }
+    }
+
     // ============ Constructor Functions ============
 
     public fun create_escrow_immutables(
@@ -252,53 +323,77 @@ module escrow::structs;
 
     // ============ Object Cleanup Functions ============
 
-    /// Clean up completed source escrow
-    public(package) fun cleanup_src_escrow<T>(escrow: EscrowSrc<T>) {
+    /// Destroy EscrowSrc after lifecycle is complete
+    public(package) fun destroy_src_escrow<T>(escrow: EscrowSrc<T>) {
         let EscrowSrc { 
             id, 
             immutables: _, 
             token_balance, 
-            sui_balance, 
-            status: _, 
-            merkle_info, 
+            safety_deposit, 
+            status: _
         } = escrow;
         
-        // Destroy empty balances
         destroy_zero(token_balance);
-        destroy_zero(sui_balance);
-        destroy_merkle_info(merkle_info);
-        
-        // Delete the object
+        destroy_zero(safety_deposit);
         object::delete(id);
     }
 
-    /// Clean up completed destination escrow
-    public(package) fun cleanup_dst_escrow<T>(escrow: EscrowDst<T>) {
+    /// Destroy EscrowDst after lifecycle is complete
+    public(package) fun destroy_dst_escrow<T>(escrow: EscrowDst<T>) {
         let EscrowDst { 
             id, 
             immutables: _, 
             token_balance, 
-            sui_balance, 
-            status: _, 
-            merkle_info 
+            safety_deposit, 
+            status: _
         } = escrow;
         
-        // Destroy empty balances
         destroy_zero(token_balance);
-        destroy_zero(sui_balance);
-        destroy_merkle_info(merkle_info);
-        
-        // Delete the object
+        destroy_zero(safety_deposit);
         object::delete(id);
     }
 
-    /// Consume and destroy MerkleSecretInfo explicitly.
-    public(package) fun destroy_merkle_info(info: MerkleSecretInfo) {
-    let MerkleSecretInfo {
-        merkle_root: _,                    
-        parts_amount:_,
-        used_indices:_,          
-    } = info;
+    /// Destroy OrderState after all fills are complete
+    public(package) fun destroy_order_state(state: OrderState) {
+        let OrderState { 
+            id, 
+            order_hash: _, 
+            merkle_root: _, 
+            total_amount: _, 
+            filled_amount: _, 
+            parts_amount: _,
+            used_indices: _,
+            resolver_fills, 
+        } = state;
+
+        let mut fills = resolver_fills;
+        while (!vector::is_empty(&fills)) {
+        let resolver_fill = vector::pop_back(&mut fills);
+        destroy_resolver_fill(resolver_fill);
+        };
+        vector::destroy_empty(resolver_fills);
+        object::delete(id);
+    }
+
+    fun destroy_resolver_fill(resolver_fill: ResolverFill) {
+        let ResolverFill {
+            resolver: _,
+            filled_amount: _,
+            indices_used: _, // vector<u8> has drop
+            timestamp: _,
+        } = resolver_fill;
+    }
+
+    /// Destroy expired AccessToken
+    public(package) fun destroy_access_token(token: AccessToken) {
+        let AccessToken { 
+            id, 
+            resolver: _, 
+            minted_at: _, 
+            expires_at: _
+        } = token;
+        
+        object::delete(id);
     }
 
 
