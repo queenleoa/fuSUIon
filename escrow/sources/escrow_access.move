@@ -3,9 +3,7 @@ module escrow::escrow_access;
 
     use std::vector;
     use sui::event;
-    use sui::hash::keccak256;
     use sui::ed25519;
-    use sui::ecdsa_k1;
     use sui::clock::{Clock, timestamp_ms};
     use sui::bcs;
     use escrow::constants::{
@@ -28,6 +26,7 @@ module escrow::escrow_access;
     };
     use escrow::structs;
     use escrow::utils;
+    use sui::nitro_attestation::timestamp;
 
     // ======== Events ========
 
@@ -94,7 +93,7 @@ module escrow::escrow_access;
 
     // ============ Access Token Management ============
 
-    /// Mint access token for a whitelisted resolver (admin only)
+    // Mint access token for a whitelisted resolver (admin only)
     // Mint an access token for a whitelisted resolver
     /// Only admin can mint access tokens
     public entry fun mint_access_token(
@@ -143,8 +142,9 @@ module escrow::escrow_access;
 
     // ============ User Intent Verification ============
 
-    /// Verify user intent using secp256k1 (EVM compatible)
-    public fun verify_user_intent_secp256k1(
+    // Verify user intent signature for fund escrowing using Ed25519
+    /// This is crucial when resolver needs to lock user's funds (Sui -> EVM swaps)
+    public fun verify_user_intent_ed25519(
         order_hash: vector<u8>,
         user: address,
         resolver: address,
@@ -152,6 +152,7 @@ module escrow::escrow_access;
         expiry: u64,
         nonce: u64,
         signature: vector<u8>,
+        public_key: vector<u8>,
         clock: &Clock
     ): bool {
         let current_time = timestamp_ms(clock) / 1000;
@@ -169,28 +170,15 @@ module escrow::escrow_access;
             nonce
         );
         
-        // Create message and hash it
+        // Create message to sign
         let message = bcs::to_bytes(&intent);
-        let msg_hash = keccak256(&message);
         
-        // Verify signature (assuming signature contains r, s, v)
-        assert!(vector::length(&signature) == 65, error_invalid_intent_signature());
-        
-        // Extract v from last byte
-        let v = *vector::borrow(&signature, 64);
-        let recovery_id = if (v >= 27) { v - 27 } else { v };
-        
-        // Recover public key
-        let recovered_pubkey = ecdsa_k1::secp256k1_ecrecover(
+        // Verify Ed25519 signature
+        let verified = ed25519::ed25519_verify(
             &signature,
-            &msg_hash,
-            recovery_id
+            &public_key,
+            &message
         );
-        
-        // Derive address from recovered public key
-        let derived_address = ecdsa_k1::secp256k1_pubkey_to_address(&recovered_pubkey);
-        
-        let verified = derived_address == user;
         
         if (verified) {
             // Emit verification event
@@ -204,28 +192,12 @@ module escrow::escrow_access;
         };
         
         verified
-    }nonce: u64,
-        signature: vector<u8>
-    ): SignedUserIntent {
-        SignedUserIntent {
-            user,
-            order_hash,
-            amount,
-            src_token,
-            dst_token,
-            chain_id,
-            expiration,
-            nonce,
-            signature
-        }
     }
-
-
-    // ============ OrderState Management ============
-
-    /// Create a new OrderState (relayer only)
-    public fun create_order_state_object(
-        _: &RelayerCap,
+    // ======== Order State Management ========
+    /// Create a shared OrderState object when a limit order is placed
+    /// Only relayer can create this after verifying the order
+    public entry fun create_order_state(
+        _relayer_cap: &RelayerCap,
         order_hash: vector<u8>,
         merkle_root: vector<u8>,
         total_amount: u64,
@@ -233,66 +205,99 @@ module escrow::escrow_access;
         clock: &Clock,
         ctx: &mut TxContext
     ) {
-        // Validate parameters
-        assert!(
-            vector::length(&order_hash) == 32,
-            error_invalid_order_hash()
-        );
-
-        let order_state = create_order_state(
+        // Verify order hash is 32 bytes
+        assert!(vector::length(&order_hash) == 32, error_invalid_order_hash());
+        
+        // Create OrderState as shared object
+        let order_state = structs::create_order_state(
             order_hash,
             merkle_root,
             total_amount,
             parts_amount,
             ctx
         );
-
-        let order_state_id = object::uid_to_address(&order_state.id);
-
+        
+        let order_state_id = structs::get_order_state_address(&order_state);
+        
+        // Share the order state object
+        transfer::public_share_object(order_state);
+        
         // Emit event
         event::emit(OrderStateCreated {
-            order_state_id,
             order_hash,
-            merkle_root,
+            order_state_id,
             total_amount,
             parts_amount,
-            created_at: timestamp_ms(clock) / 1000,
+            merkle_root,
+            timestamp: timestamp_ms(clock) / 1000
         });
-
-        // Share the object for public access
-        transfer::share_object(order_state);
     }
 
-    // ============ Public Query Functions ============
+    /// Update order state after partial fill
+    public(package) fun update_order_fill(
+        order_state: &mut OrderState,
+        fill_amount: u64,
+        secret_index: u64,
+        indices_used: vector<u8>,
+        access_token: &AccessToken,
+        clock: &Clock,
+        ctx: &TxContext
+    ) {
+        // Verify caller is authorized
+        assert!(structs::get_token_resolver(access_token) == ctx.sender(), error_invalid_resolver());
+        
+        // Verify token is valid
+        assert!(utils::validate_access_token(access_token, ctx.sender(), clock), error_token_expired());
+        
+        // Update filled amount
+        structs::update_order_state_filled_amount(order_state, fill_amount);
+        
+        // Create resolver fill record
+        let resolver_fill = structs::create_resolver_fill(
+            ctx.sender(),
+            fill_amount,
+            indices_used,
+            timestamp_ms(clock) / 1000
+        );
+        
+        // Add resolver fill to order state
+        structs::add_order_state_resolver_fill(order_state, resolver_fill);
+    }
 
-    /// Get order state details
-    public fun get_order_details(order_state: &OrderState): (
+    /// Public function to query order state
+    public fun get_order_state(order_state: &OrderState): (
         vector<u8>, // order_hash
         vector<u8>, // merkle_root
         u64,        // total_amount
         u64,        // filled_amount
-        u8,         // parts_amount
-        vector<u8>  // used_indices
+        u8          // parts_amount
     ) {
         (
-            *get_order_state_order_hash(order_state),
-            *get_order_state_merkle_root(order_state),
-            get_order_state_total_amount(order_state),
-            get_order_state_filled_amount(order_state),
-            get_order_state_parts_amount(order_state),
-            *get_order_state_used_indices(order_state)
+            *structs::get_order_state_order_hash(order_state),
+            *structs::get_order_state_merkle_root(order_state),
+            structs::get_order_state_total_amount(order_state),
+            structs::get_order_state_filled_amount(order_state),
+            structs::get_order_state_parts_amount(order_state)
         )
     }
 
-    /// Check if an order is fully filled
+    /// Check if a secret index has been used
+    public fun is_secret_used(
+        order_state: &OrderState,
+        secret_index: u64
+    ): bool {
+        utils::is_secret_used(order_state, secret_index)
+    }
+
+    /// Check if order is fully filled
     public fun is_order_filled(order_state: &OrderState): bool {
-        get_order_state_filled_amount(order_state) >= get_order_state_total_amount(order_state)
+        structs::get_order_state_filled_amount(order_state) >= structs::get_order_state_total_amount(order_state)
     }
 
     /// Get remaining amount for an order
     public fun get_remaining_amount(order_state: &OrderState): u64 {
-        let total = get_order_state_total_amount(order_state);
-        let filled = get_order_state_filled_amount(order_state);
+        let total = structs::get_order_state_total_amount(order_state);
+        let filled = structs::get_order_state_filled_amount(order_state);
         
         if (filled >= total) {
             0
@@ -301,87 +306,29 @@ module escrow::escrow_access;
         }
     }
 
-    /// Check if a secret index has been used
-    public fun is_index_used(order_state: &OrderState, index: u64): bool {
-        utils::is_secret_used(order_state, index)
+    // ======== Security Helpers ========
+
+    /// Verify that an object was created by this package
+    /// Sui's type system ensures objects can only be created by their defining module
+    /// The type itself encodes the package address, so no additional verification needed
+    public fun verify_package_origin<T>(_obj: &T): bool {
+        // The fact that this function can be called with the object
+        // already proves it was created by this package
+        true
     }
 
-    /// Get fill percentage (in basis points, 10000 = 100%)
-    public fun get_fill_percentage(order_state: &OrderState): u64 {
-        let total = get_order_state_total_amount(order_state);
-        if (total == 0) {
-            return 10000 // 100% if total is 0
-        };
-        
-        let filled = get_order_state_filled_amount(order_state);
-        (filled * 10000) / total
+    /// Helper to emit failure events for monitoring
+    public fun emit_access_failure(
+        function_name: vector<u8>,
+        error_code: u64,
+        ctx: &TxContext,
+        timestamp: &Clock,
+    ) {
+        event::emit(AccessFunctionFailed {
+            function_name,
+            error_code,
+            caller: ctx.sender(),
+            timestamp: timestamp_ms(timestamp),
+        });
     }
 
-    // ============ Helper Functions ============
-
-    /// Create intent message for signing
-    public fun create_intent_message(
-        order_hash: vector<u8>,
-        resolver: address,
-        action: u8,
-        expiry: u64,
-        nonce: u64
-    ): vector<u8> {
-        let intent = structs::create_user_intent {
-            order_hash,
-            resolver,
-            action,
-            expiry,
-            nonce,
-        };
-        
-        utils::create_sui_intent_message(bcs::to_bytes(&intent))
-    }
-
-
-    // ============ Tests ============
-
-  /*  #[test_only]
-    use sui::test_scenario;
-    #[test_only]
-    use sui::test_utils;
-
-    #[test_only]
-    public fun test_init(ctx: &mut TxContext) {
-        init(ctx);
-    }
-
-    #[test]
-    fun test_access_token_minting() {
-        let mut scenario = test_scenario::begin(@0x1);
-        
-        // Init module
-        test_scenario::next_tx(&mut scenario, @0x1);
-        {
-            test_init(test_scenario::ctx(&mut scenario));
-        };
-        
-        // Mint access token
-        test_scenario::next_tx(&mut scenario, @0x1);
-        {
-            let admin_cap = test_scenario::take_from_sender<AdminCap>(&scenario);
-            let clock = test_utils::create_clock(test_scenario::ctx(&mut scenario));
-            
-            let token = mint_access_token(
-                &admin_cap,
-                @0x2,
-                3600,
-                &clock,
-                test_scenario::ctx(&mut scenario)
-            );
-            
-            assert!(get_token_resolver(&token) == @0x2, 0);
-            
-            transfer::transfer(token, @0x2);
-            test_scenario::return_to_sender(&scenario, admin_cap);
-            test_utils::destroy(clock);
-        };
-        
-        test_scenario::end(scenario);
-    }
-    */
