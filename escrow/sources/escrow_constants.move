@@ -30,6 +30,8 @@ module escrow::constants;
     public fun error_invalid_immutables(): u8 { 24 }
     public fun error_invalid_secrets_amount(): u8 { 25 }
     public fun error_invalid_creation_time(): u8 { 26 }
+    public fun error_invalid_resolber(): u8 { 27 }
+
 
 // ============ Status Constants ============
 

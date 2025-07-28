@@ -1,62 +1,78 @@
 /// Module: escrow
-module escrow::access;
+module escrow::escrow_access;
 
-    use std::string::String;
-    use sui::clock::{Clock, timestamp_ms};
+    use std::vector;
     use sui::event;
+    use sui::hash::keccak256;
     use sui::ed25519;
     use sui::ecdsa_k1;
+    use sui::clock::{Clock, timestamp_ms};
     use sui::bcs;
-    use escrow::constants;
-    use escrow::structs;
+    use escrow::constants::{
+        error_not_authorized,
+        error_invalid_resolver,
+        error_invalid_intent_signature,
+        error_invalid_order_hash,
+        error_invalid_time,
+        error_token_expired,
+        error_invalid_access_token,
+        intent_action_create,
+        intent_action_cancel,
+        default_token_validity
+    };
     use escrow::structs::{
         AccessToken,
         OrderState,
         UserIntent,
+        ResolverFill
     };
+    use escrow::structs;
     use escrow::utils;
 
-    // ============ Admin Capability ============
+    // ======== Events ========
 
-    /// Admin capability - created at module init
+    public struct AccessTokenMinted has copy, drop {
+        resolver: address,
+        token_id: address,
+        timestamp: u64,
+        admin: address,
+        expires_at: u64
+    }
+
+    public struct UserIntentVerified has copy, drop {
+        user: address,
+        order_hash: vector<u8>,
+        action: u8,
+        resolver: address,
+        timestamp: u64
+    }
+
+    public struct OrderStateCreated has copy, drop {
+        order_hash: vector<u8>,
+        order_state_id: address,
+        total_amount: u64,
+        parts_amount: u8,
+        merkle_root: vector<u8>,
+        timestamp: u64
+    }
+
+    public struct AccessFunctionFailed has copy, drop {
+        function_name: vector<u8>,
+        error_code: u64,
+        caller: address,
+        timestamp: u64
+    }
+
+    // ======== Admin Capability ========
+
     public struct AdminCap has key, store {
         id: UID
     }
 
-    /// Relayer capability - allows creating OrderState objects
+    // ======== Relayer Capability ========
+
     public struct RelayerCap has key, store {
         id: UID
-    }
-
-    // ============ Events ============
-
-    /// Emitted when access token is minted
-    public struct AccessTokenMinted has copy, drop {
-        token_id: address,
-        resolver: address,
-        minted_at: u64,
-        expires_at: u64,
-    }
-
-    /// Emitted when a new OrderState is created
-    public struct OrderStateCreated has copy, drop {
-        order_state_id: address,
-        order_hash: vector<u8>,
-        merkle_root: vector<u8>,
-        total_amount: u64,
-        parts_amount: u8,
-        created_at: u64,
-    }
-
-    /// Emitted when user intent is verified
-    public struct UserIntentVerified has copy, drop {
-        order_hash: vector<u8>,
-        maker: address,
-        resolver: address,
-        action: u8,
-        verified_at: u64,
-        expiry: u64,
-        nonce: u64,
     }
 
     // ============ Init Function ============
