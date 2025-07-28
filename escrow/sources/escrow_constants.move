@@ -24,6 +24,12 @@ module escrow::constants;
     public fun error_invalid_merkle_index(): u8 { 18 }
     public fun error_invalid_intent_signature(): u8 { 19 }
     public fun error_resolver_not_whitelisted(): u8 { 20 }
+    public fun error_invalid_caller(): u8 { 21 }
+    public fun error_invalid_time(): u8 { 22 }
+    public fun error_token_expired(): u8 { 23 }
+    public fun error_invalid_immutables(): u8 { 24 }
+    public fun error_invalid_secrets_amount(): u8 { 25 }
+    public fun error_invalid_creation_time(): u8 { 26 }
 
 // ============ Status Constants ============
 
@@ -43,12 +49,18 @@ module escrow::constants;
     public fun dst_public_withdrawal(): u8 { 5 }
     public fun dst_cancellation(): u8 { 6 }
 
+// ============ Intent Action Constants ============
+
+    /// Intent action types
+    public fun intent_action_create(): u8 { 0 }
+    public fun intent_action_cancel(): u8 { 1 }
+
 // ============ Merkle Tree Constants ============
 
     /// Constants for merkle tree operations
     public fun max_parts_amount(): u8 { 255 }  // Maximum number of parts an order can be split into
     public fun merkle_root_size(): u64 { 32 }  // Size of merkle root in bytes
-    public fun secret_hash_size(): u64 { 32 }  // Size of keccak256 hash in bytes
+    public fun secret_hash_size(): u64 { 32 }  // Size of keccak256 hash in bytes    
 
 // ============ Default Timelock Values (in seconds) ============
 
@@ -69,5 +81,12 @@ module escrow::constants;
     /// Maximum allowed slippage for partial fills (basis points)
     public fun max_slippage_bps(): u64 { 100 }  // 1%
 
-    /// Access token validity period (in seconds)
-    public fun access_token_validity(): u64 { 86400 }  // 24 hours
+// ============ Access Token Constants ============
+
+    /// Default token validity period (24 hours in seconds)
+    public fun default_token_validity(): u64 { 86400 }
+
+// ============ Signature Constants ============
+
+    /// Sui intent message prefix
+    public fun sui_intent_prefix(): vector<u8> { b"SuiSignedMessage"}
