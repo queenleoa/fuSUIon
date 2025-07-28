@@ -10,22 +10,15 @@ module escrow::structs;
 
     /// Core immutable parameters for escrow operations
     public struct EscrowImmutables has copy, drop, store {
-        order_hash: vector<u8>,      // 32 bytes
-        hashlock: vector<u8>,        // 32 bytes - keccak256(secret) or merkle root
-        maker: address,
-        taker: address,
-        token_type: String,          // Token type identifier
-        amount: u64,
-        safety_deposit: u64,         // by resolver In SUI
-        timelocks: Timelocks,
-    }
-
-    /// Merkle secret tree info for partial fills
-    /// protect used indices from replay bugs by omitting copy and drop
-    public struct MerkleSecretInfo has store {
-        merkle_root: vector<u8>,     // 32 bytes
-        parts_amount: u8,            // Number of parts the order is split into
-        used_indices: vector<u8>,    // Indices of used secrets
+        order_hash: vector<u8>,      // 32 bytes - unique identifier for the order
+        hashlock: vector<u8>,        // 32 bytes - keccak256(secret) for the specific fill
+        maker: address,              // Address that provides source tokens
+        taker: address,              // Address that provides destination tokens
+        token_type: String,          // Token type identifier (for generic token support)
+        amount: u64,                 // Amount of tokens to be swapped
+        safety_deposit: u64,         // Safety deposit amount in SUI (paid by resolver)
+        resolver: address,           // Address of the resolver handling this escrow
+        timelocks: Timelocks,       // Timelock configuration
     }
 
     /// Timelocks configuration
@@ -40,15 +33,14 @@ module escrow::structs;
         dst_cancellation: u64,
     }
 
-    /// Source chain escrow object - ensure SHARED for consensus
-    /// holds maker tokens
+    /// Source chain escrow object - holds maker's tokens
+    /// Must be a shared object for cross-party access
     public struct EscrowSrc<phantom T> has key, store {
         id: UID,
         immutables: EscrowImmutables,
-        token_balance: Balance<T>,
-        sui_balance: Balance<SUI>,
-        status: u8,
-        merkle_info: MerkleSecretInfo,
+        token_balance: Balance<T>,           // Maker's locked tokens
+        safety_deposit: Balance<SUI>,        // Resolver's safety deposit
+        status: u8,                          // Current status (active/withdrawn/cancelled)
     }
 
     /// Destination chain escrow object - ensure SHARED for consensus
@@ -56,27 +48,47 @@ module escrow::structs;
     public struct EscrowDst<phantom T> has key, store {
         id: UID,
         immutables: EscrowImmutables,
-        token_balance: Balance<T>,
-        sui_balance: Balance<SUI>,
-        status: u8,
-        merkle_info: MerkleSecretInfo
+        token_balance: Balance<T>,           // Taker's locked tokens
+        safety_deposit: Balance<SUI>,        // Resolver's safety deposit
+        status: u8,                          // Current status (active/withdrawn/cancelled)
     }
 
-    /// Factory state for global configuration
-    public struct AccessFactory has key {
+    /// Represents the state of an order across all fills
+    /// Created by relayer when order is placed
+    public struct OrderState has key, store {
         id: UID,
-        rescue_delay: u64,
-        access_token_supply: u64,
-        admin: address,
+        order_hash: vector<u8>,              // 32 bytes - order identifier
+        merkle_root: vector<u8>,             // 32 bytes - merkle tree root
+        total_amount: u64,                   // Total order amount
+        filled_amount: u64,                  // Amount filled so far
+        parts_amount: u8,                    // Total number of parts (N)
+        used_indices: vector<u8>,            // Indices that have been used
+        resolver_fills: vector<ResolverFill>, // Track fills by each resolver
     }
 
-    /// Access token for public operations with expiration
+    /// Track individual resolver fills for an order
+    public struct ResolverFill has store {
+        resolver: address,
+        filled_amount: u64,
+        indices_used: vector<u8>,
+        timestamp: u64,
+    }
+
+    /// Access token for resolver authorization
     public struct AccessToken has key, store {
         id: UID,
-        created_at: u64,
-        expires_at: u64,
-        escrow_id: Option<address>,
-        used: bool,
+        resolver: address,                   // Resolver this token is minted for
+        minted_at: u64,                     // When the token was minted
+        expires_at: u64,                    // When the token expires
+    }
+
+    /// User intent for authorizing resolver actions
+    public struct UserIntent has drop {
+        order_hash: vector<u8>,
+        resolver: address,
+        action: u8,                         // 0: create, 1: cancel
+        expiry: u64,
+        nonce: u64,
     }
 
     // ============ Constructor Functions ============
