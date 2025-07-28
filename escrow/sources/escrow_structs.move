@@ -2,7 +2,7 @@
 module escrow::structs;
 
     use std::string::String;
-    use sui::balance::{Balance, split, withdraw_all, destroy_zero};
+    use sui::balance::{Balance, split, withdraw_all, destroy_zero, value};
     use sui::sui::SUI;
     use escrow::constants::{status_active, error_secret_already_used};
 
@@ -16,7 +16,7 @@ module escrow::structs;
         taker: address,              // Address that provides destination tokens
         token_type: String,          // Token type identifier (for generic token support)
         amount: u64,                 // Amount of tokens to be swapped
-        safety_deposit: u64,         // Safety deposit amount in SUI (paid by resolver)
+        safety_deposit_amount: u64,         // Safety deposit amount in SUI (paid by resolver)
         resolver: address,           // Address of the resolver handling this escrow
         timelocks: Timelocks,       // Timelock configuration
     }
@@ -90,6 +90,55 @@ module escrow::structs;
         expiry: u64,
         nonce: u64,
     }
+
+    // ============ Getter Functions ============
+
+    // EscrowImmutables getters
+    public fun get_order_hash(immutables: &EscrowImmutables): &vector<u8> { &immutables.order_hash }
+    public fun get_hashlock(immutables: &EscrowImmutables): &vector<u8> { &immutables.hashlock }
+    public fun get_maker(immutables: &EscrowImmutables): address { immutables.maker }
+    public fun get_taker(immutables: &EscrowImmutables): address { immutables.taker }
+    public fun get_token_type(immutables: &EscrowImmutables): &String { &immutables.token_type }
+    public fun get_amount(immutables: &EscrowImmutables): u64 { immutables.amount }
+    public fun get_safety_deposit_amount(immutables: &EscrowImmutables): u64 { immutables.safety_deposit_amount }
+    public fun get_resolver(immutables: &EscrowImmutables): address { immutables.resolver }
+    public fun get_timelocks(immutables: &EscrowImmutables): &Timelocks { &immutables.timelocks }
+
+    // Timelocks getters
+    public fun get_deployed_at(timelocks: &Timelocks): u64 { timelocks.deployed_at }
+    public fun get_src_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_withdrawal }
+    public fun get_src_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_public_withdrawal }
+    public fun get_src_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_cancellation }
+    public fun get_src_public_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_public_cancellation }
+    public fun get_dst_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_withdrawal }
+    public fun get_dst_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_public_withdrawal }
+    public fun get_dst_cancellation_time(timelocks: &Timelocks): u64 { timelocks.dst_cancellation }
+
+    // EscrowSrc getters
+    public fun get_src_immutables<T>(escrow: &EscrowSrc<T>): &EscrowImmutables { &escrow.immutables }
+    public fun get_src_token_balance<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.token_balance) }
+    public fun get_src_safety_deposit<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.safety_deposit) }
+    public fun get_src_status<T>(escrow: &EscrowSrc<T>): u8 { escrow.status }
+
+    // EscrowDst getters
+    public fun get_dst_immutables<T>(escrow: &EscrowDst<T>): &EscrowImmutables { &escrow.immutables }
+    public fun get_dst_token_balance<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.token_balance) }
+    public fun get_dst_safety_deposit<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.safety_deposit) }
+    public fun get_dst_status<T>(escrow: &EscrowDst<T>): u8 { escrow.status }
+
+
+    // OrderState getters
+    public fun get_order_state_hash(state: &OrderState): &vector<u8> { &state.order_hash }
+    public fun get_order_merkle_root(state: &OrderState): &vector<u8> { &state.merkle_root }
+    public fun get_total_amount(state: &OrderState): u64 { state.total_amount }
+    public fun get_filled_amount(state: &OrderState): u64 { state.filled_amount }
+    public fun get_order_parts_amount(state: &OrderState): u8 { state.parts_amount }
+    public fun get_used_indices(state: &OrderState): &vector<u8> { &state.used_indices }
+
+    // AccessToken getters
+    public fun get_token_resolver(token: &AccessToken): address { token.resolver }
+    public fun get_token_expiry(token: &AccessToken): u64 { token.expires_at }
+
 
     // ============ Constructor Functions ============
 
@@ -181,11 +230,6 @@ module escrow::structs;
     public fun get_dst_sui_balance<T>(escrow: &EscrowDst<T>): &Balance<SUI> { &escrow.sui_balance}
     public fun get_dst_merkle_info<T>(escrow: &EscrowDst<T>): &MerkleSecretInfo { &escrow.merkle_info }
 
-    // Factory getters
-    public fun get_rescue_delay(factory: &AccessFactory): u64 { factory.rescue_delay }
-    public fun get_access_token_supply(factory: &AccessFactory): u64 { factory.access_token_supply }
-    public fun get_admin(factory: &AccessFactory): address { factory.admin }
-
     // Access token getter
     public fun get_access_token_created_at(access_token: &AccessToken): u64 { access_token.created_at }
     public fun get_access_token_expires_at(access_token: &AccessToken): u64 { access_token.expires_at }
@@ -193,15 +237,7 @@ module escrow::structs;
     public fun is_access_token_used(access_token: &AccessToken): bool { access_token.used }
     public fun get_access_token_address(tok: &AccessToken): address { object::uid_to_address(&tok.id) }
 
-    // Timelocks getter
-    public fun get_deployed_at(timelocks: &Timelocks): u64 { timelocks.deployed_at }
-    public fun get_src_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_withdrawal }
-    public fun get_src_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_public_withdrawal }
-    public fun get_src_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_cancellation }
-    public fun get_src_public_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_public_cancellation }
-    public fun get_dst_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_withdrawal }
-    public fun get_dst_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.dst_public_withdrawal }
-    public fun get_dst_cancellation_time(timelocks: &Timelocks): u64 { timelocks.dst_cancellation }
+    
     // ============ Escrow Creation Functions ============
 
     // EscrowSrc setter
