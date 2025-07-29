@@ -137,21 +137,21 @@ module escrow::structs;
 
     // ============ Balance Operations for escrows ============
 
-    // Extract balances for withdrawals
-    public(package) fun extract_src_tokens<T>(escrow: &mut EscrowSrc<T>): Balance<SUI> {
-        withdraw_all(&mut escrow.token_balance)
+    // These functions extract both balances in a single operation to avoid 
+    // multiple mutable borrows
+
+    /// Extract both token balance and safety deposit from source escrow
+    public(package) fun extract_all_from_src<T>(escrow: &mut EscrowSrc<T>): (Balance<SUI>, Balance<SUI>) {
+        let tokens = withdraw_all(&mut escrow.token_balance);
+        let safety_deposit = withdraw_all(&mut escrow.safety_deposit);
+        (tokens, safety_deposit)
     }
 
-    public(package) fun extract_src_safety_deposit<T>(escrow: &mut EscrowSrc<T>): Balance<SUI> {
-        withdraw_all(&mut escrow.safety_deposit)
-    }
-
-    public(package) fun extract_dst_tokens<T>(escrow: &mut EscrowDst<T>): Balance<SUI> {
-        withdraw_all(&mut escrow.token_balance)
-    }
-
-    public(package) fun extract_dst_safety_deposit<T>(escrow: &mut EscrowDst<T>): Balance<SUI> {
-        withdraw_all(&mut escrow.safety_deposit)
+    /// Extract both token balance and safety deposit from destination escrow  
+    public(package) fun extract_all_from_dst<T>(escrow: &mut EscrowDst<T>): (Balance<SUI>, Balance<SUI>) {
+        let tokens = withdraw_all(&mut escrow.token_balance);
+        let safety_deposit = withdraw_all(&mut escrow.safety_deposit);
+        (tokens, safety_deposit)
     }
 
     // ============ Constructor Functions for Keyed Structs ============

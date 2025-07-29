@@ -4,11 +4,8 @@ module escrow::escrow_create;
     use sui::sui::SUI;
     use sui::coin::{Self, Coin};
     use sui::clock::Clock;
-    use sui::transfer;
-    use sui::balance;
-    use sui::object;
     use std::string;
-    use escrow::structs::{Self, Wallet, EscrowSrc, EscrowDst, EscrowImmutables, Timelocks};
+    use escrow::structs::{ Self, Wallet};
     use escrow::events;
     use escrow::utils;
     use escrow::constants::{
@@ -16,21 +13,8 @@ module escrow::escrow_create;
         e_invalid_timelock,
         e_invalid_hashlock,
         e_invalid_order_hash,
-        e_invalid_secret,
-        e_unauthorised,
-        e_already_withdrawn,
-        e_not_withdrawable,
-        e_already_cancelled,
-        e_not_cancellable,
         e_safety_deposit_too_low,
         min_safety_deposit,
-        status_active,
-        status_withdrawn,
-        status_cancelled,
-        stage_resolver_exclusive_withdraw,
-        stage_public_withdraw,
-        stage_resolver_exclusive_cancel,
-        stage_public_cancel,
     };
 
     // ============ Wallet Creation (Sui as Source) ============
