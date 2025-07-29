@@ -37,6 +37,8 @@ module escrow::escrow_create;
 
     /// Create a pre-funded wallet for Sui->EVM swaps
     /// Maker deposits funds that resolvers can later use to create escrows
+    /// @param order_hash - 32-byte unique order identifier
+    /// @param funding - SUI coins to deposit in the wallet
     entry fun create_wallet(
         order_hash: vector<u8>,
         funding: Coin<SUI>,
