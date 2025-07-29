@@ -46,3 +46,4 @@ module escrow::constants;
     /// balance errors
     public fun e_insufficient_balance(): u64 { 1013 }
     public fun e_safety_deposit_too_low(): u64 { 1014 }
+    public fun e_wallet_inactive(): u64 { 1015 }

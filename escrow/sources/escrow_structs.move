@@ -2,9 +2,10 @@
 module escrow::structs;
 
     use std::string::String;
-    use sui::balance::{Balance, withdraw_all, destroy_zero, value};
+    use sui::balance::{Balance, withdraw_all, split, destroy_zero, value};
     use sui::sui::SUI;
     use escrow::constants::{status_active};
+    use escrow::constants::e_insufficient_balance;
 
 // ======== Wallet (Sui as source chain) ========
     // Design rationale: wallet is a pre-funded wallet that makers create
@@ -248,6 +249,32 @@ module escrow::structs;
             dst_public_withdrawal,
             dst_cancellation,
         }
+    }
+
+    // Withdraws funds from wallet to create an escrow
+    // Returns the balance for the wallet
+    public(package) fun withdraw_from_wallet_for_escrow(
+    wallet: &mut Wallet,
+    escrow_amount: u64,
+    ): Balance<SUI> {
+        // 1. Wallet must still be usable
+        assert!(wallet.is_active, e_wallet_inactive());
+
+        // 2. Must hold enough SUI
+        assert!(
+            value(&wallet.balance) >= escrow_amount,
+            e_insufficient_balance()
+        );
+        //    `balance::split` :: (&mut Balance<T>, u64) -> Balance<T>
+        //    ‑ moves the requested amount into a *new* Balance<T> and shrinks the
+        //      original in‑place.
+        split(&mut wallet.balance, escrow_amount)
+    }
+    
+    // Return unused funds to maker when wallet is closed
+    public(package) fun close_vault(wallet: &mut Wallet): Balance<SUI> {
+        wallet.is_active = false;
+        withdraw_all(&mut wallet.balance)
     }
 
     // ============ Object Cleanup Functions ============
