@@ -80,7 +80,7 @@ module escrow::utils;
     // -----------------------------------------------------------------------------
     // 1. Validate that a Timelocks struct is sane
     // -----------------------------------------------------------------------------
-        public fun is_valid_timelocks(tl: &Timelocks): bool {
+    public(package) fun is_valid_timelocks(tl: &Timelocks): bool {
         // Monotonic sequence on the destination chain
         let dst_ok =
             get_deployed_at(tl)              < get_dst_withdrawal_time(tl) &&
@@ -109,7 +109,7 @@ module escrow::utils;
     /// Returns one of your stage constants (0‑4) based on the
     /// will implement rescue later
     /// current wall‑clock time *and* the source‑side deadlines.
-    public fun src_stage(tl: &Timelocks, clock: &Clock): u8 {
+    public(package) fun src_stage(tl: &Timelocks, clock: &Clock): u8 {
         let now = timestamp_ms(clock);  // use now_seconds() if you store seconds
 
         if (now < get_deployed_at(tl)) {
@@ -131,7 +131,7 @@ module escrow::utils;
 
     /// Destination side has fewer windows: withdraw, public withdraw,
     /// cancel. After `dst_cancellation` the source chain’s logic takes over.
-    public fun dst_stage(tl: &Timelocks, clock: &Clock): u8 {
+    public(package) fun dst_stage(tl: &Timelocks, clock: &Clock): u8 {
         let now = timestamp_ms(clock);  // use now_seconds() if you store seconds
 
         if (now < get_deployed_at(tl)) {
