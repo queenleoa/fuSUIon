@@ -4,8 +4,8 @@ module escrow::structs;
     use std::string::String;
     use sui::balance::{Balance, withdraw_all, split, destroy_zero, value};
     use sui::sui::SUI;
-    use escrow::constants::{status_active};
-    use escrow::constants::e_insufficient_balance;
+    use escrow::constants::{status_active, e_insufficient_balance, e_wallet_inactive};
+   
 
 // ======== Wallet (Sui as source chain) ========
     // Design rationale: wallet is a pre-funded wallet that makers create
@@ -131,7 +131,7 @@ module escrow::structs;
     }
 
 
-    // ============ Balance Operations ============
+    // ============ Balance Operations for escrows ============
 
     // Extract balances for withdrawals
     public(package) fun extract_src_tokens<T>(escrow: &mut EscrowSrc<T>): Balance<SUI> {
@@ -152,7 +152,7 @@ module escrow::structs;
 
     // ============ Constructor Functions for Keyed Structs ============
 
-    /// Create a new Wallet
+    /// Create a new Wallet. Entry Fn. Call using PTB
     public(package) fun create_wallet (
         order_hash: vector<u8>,
         maker: address,
