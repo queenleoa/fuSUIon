@@ -29,7 +29,7 @@ module escrow::escrow_withdraw;
     ) {
         let caller = tx_context::sender(ctx);
 
-        //************ READ‑ONLY SCOPE ************//
+        // ************ READ‑ONLY SCOPE ************ //
         let (taker, maker, order_hash, amount) = {
             let imm = structs::get_src_immutables(escrow);
 
@@ -48,7 +48,7 @@ module escrow::escrow_withdraw;
             } else if (current_stage == stage_public_withdraw()) {
                 // anyone can withdraw
             } else {
-                abort e_not_withdrawable();
+                abort e_not_withdrawable()
             };
 
                 // Bind results to locals, then return tuple (no semicolon!)
@@ -60,7 +60,7 @@ module escrow::escrow_withdraw;
                 (copy taker_local, copy maker_local, order_hash_local, amount_local)
                 // immutable borrow ends here
         };
-        //************ MUTATION PHASE ************//
+        // ************ MUTATION PHASE ************ //
 
         // Needs &mut, so borrow is now clear
         let (token_balance, safety_deposit) = structs::extract_all_from_src(escrow);
@@ -92,7 +92,7 @@ module escrow::escrow_withdraw;
     ) { 
         let caller = tx_context::sender(ctx);
 
-        //************ READ‑ONLY SCOPE ************//
+        // ************ READ‑ONLY SCOPE ************ //
         // Returns (maker, taker, order_hash, amount)
         let (maker, taker, order_hash, amount) = {
             let imm = structs::get_dst_immutables(escrow);
@@ -115,7 +115,7 @@ module escrow::escrow_withdraw;
             } else if (current_stage == stage_public_withdraw()) {
                 // anyone can withdraw
             } else {
-                abort e_not_withdrawable();
+                abort e_not_withdrawable()
             };
 
             let maker_local      = structs::get_maker(imm);
