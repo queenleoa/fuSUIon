@@ -4,7 +4,11 @@ module escrow::structs;
     use std::string::String;
     use sui::balance::{Balance, withdraw_all, split, destroy_zero, value};
     use sui::sui::SUI;
-    use escrow::constants::{status_active, e_insufficient_balance, e_wallet_inactive};
+    use escrow::constants::{
+        status_active, 
+        e_insufficient_balance, 
+        e_wallet_inactive
+        };
    
 
 // ======== Wallet (Sui as source chain) ========
