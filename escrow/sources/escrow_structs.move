@@ -16,7 +16,7 @@ module escrow::structs;
     // Resolvers can pull funds from this wallet to create escrows
     // This enables partial fills - multiple resolvers can create escrows from one wallet
     // The wallet itself is NOT the escrow - it's just a funding source
-    public struct Wallet has key {
+    public struct Wallet has key, store {
         id: UID,
         order_hash: vector<u8>,
         maker: address,
