@@ -12,61 +12,37 @@ module escrow::constants;
 
     /// Timelock stages
     public fun stage_finality_lock(): u8 { 0 }
-    public fun stage_hashlock_unlock(): u8 { 1 }
-    public fun stage_resolver_exclusive_withdraw(): u8 { 2 }
-    public fun stage_public_withdraw(): u8 { 3 }
-    public fun stage_resolver_exclusive_cancel(): u8 { 4 }
-    public fun stage_public_cancel(): u8 { 5 }
-    public fun stage_rescue(): u8 { 6 }
+    public fun stage_resolver_exclusive_withdraw(): u8 { 1 }
+    public fun stage_public_withdraw(): u8 { 2 }
+    public fun stage_resolver_exclusive_cancel(): u8 { 3 }
+    public fun stage_public_cancel(): u8 { 4 } //for sui as a source chain
+    public fun stage_rescue(): u8 { 5 }
 
-// ============ Vault Configuration ============
-    
-    /// Maximum number of buckets per vault
-    public fun max_buckets_per_vault(): u64 { 100 }
-    
+// ============ Safety Deposit ============
+
     /// Minimum safety deposit amount (in MIST)
     public fun min_safety_deposit(): u64 { 100_000_000 } // 0.1 SUI
 
 // ============ Error Codes ============
     
-    /// Error when vault is full
-    public fun e_vault_full(): u64 { 1001 }
-    
-    /// Error when bucket not found
-    public fun e_bucket_not_found(): u64 { 1002 }
-    
-    /// Error when invalid hashlock
+    /// Validation errors
+    public fun e_invalid_amount(): u64 { 1001 }
+    public fun e_invalid_timelock(): u64 { 1002 }
     public fun e_invalid_hashlock(): u64 { 1003 }
-    
-    /// Error when invalid secret
     public fun e_invalid_secret(): u64 { 1004 }
+    public fun e_invalid_address(): u64 { 1005 }
     
-    /// Error when timelock not expired
-    public fun e_timelock_not_expired(): u64 { 1005 }
+    /// State errors
+    public fun e_already_withdrawn(): u64 { 1006 }
+    public fun e_not_withdrawable(): u64 { 1007 }
+    public fun e_already_cancelled(): u64 { 1008 }
+    public fun e_not_cancellable(): u64 { 1009 }
     
-    /// Error when action not allowed in current stage
-    public fun e_invalid_stage(): u64 { 1006 }
+    /// Access errors
+    public fun e_unauthorised(): u64 { 1010 }
+    public fun e_public_withdraw_not_started(): u64 { 1011 }
+    public fun e_public_cancel_not_started(): u64 { 1012 }
     
-    /// Error when insufficient balance
-    public fun e_insufficient_balance(): u64 { 1007 }
-    
-    /// Error when unauthorized access
-    public fun e_unauthorized(): u64 { 1008 }
-    
-    /// Error when bucket already exists
-    public fun e_bucket_already_exists(): u64 { 1009 }
-    
-    /// Error when invalid amount
-    public fun e_invalid_amount(): u64 { 1010 }
-    
-    /// Error when vault is empty
-    public fun e_vault_empty(): u64 { 1011 }
-    
-    /// Error when rescue period not reached
-    public fun e_rescue_period_not_reached(): u64 { 1012 }
-    
-    /// Error when bucket status is invalid for operation
-    public fun e_invalid_bucket_status(): u64 { 1013 }
-    
-    /// Error when safety deposit is too low
+    /// balance errors
+    public fun e_insufficient_balance(): u64 { 1013 }
     public fun e_safety_deposit_too_low(): u64 { 1014 }
