@@ -29,9 +29,9 @@ module escrow::escrow_tests;
     fun setup_test(): (Scenario, Clock, vector<u8>, vector<u8>) {
         let mut scenario = test::begin(MAKER);
         let clock = clock::create_for_testing(ctx(&mut scenario));
-        
+        let secret = SECRET;
         let order_hash = b"order_hash_32_bytes_long_1234567";
-        let hashlock = hash::keccak256(&SECRET);
+        let hashlock = hash::keccak256(&secret);
         
         (scenario, clock, order_hash, hashlock)
     }
