@@ -20,11 +20,14 @@ module escrow::escrow_tests;
     const RESOLVER: address = @0xC;
     const OTHER_RESOLVER: address = @0xD;
     
-    const AMOUNT: u64 = 1_000_000_000; // 1 SUI
+    const AMOUNT: u64 = 1_000_000_000; // 1 token unit
     const SAFETY_DEPOSIT: u64 = 100_000_000; // 0.1 SUI
     
     // Test secret and hashlock
     const SECRET: vector<u8> = b"test_secret_32_bytes_long_1234567";
+    
+    // Test token type for generic testing
+    public struct TEST_TOKEN has drop {}
     
     fun setup_test(): (Scenario, Clock, vector<u8>, vector<u8>) {
         let mut scenario = test::begin(MAKER);
@@ -36,6 +39,10 @@ module escrow::escrow_tests;
         (scenario, clock, order_hash, hashlock)
     }
     
+    fun mint_token<T>(amount: u64, scenario: &mut Scenario): Coin<T> {
+        coin::mint_for_testing<T>(amount, ctx(scenario))
+    }
+
     fun mint_sui(amount: u64, scenario: &mut Scenario): Coin<SUI> {
         coin::mint_for_testing<SUI>(amount, ctx(scenario))
     }
@@ -46,7 +53,7 @@ module escrow::escrow_tests;
         
         next_tx(&mut scenario, MAKER);
         {
-            let funding = mint_sui(AMOUNT, &mut scenario);
+            let funding = mint_token<TEST_TOKEN>(AMOUNT, &mut scenario);
             escrow_create::create_wallet(
                 order_hash,
                 funding,
@@ -58,7 +65,7 @@ module escrow::escrow_tests;
         // Verify wallet exists
         next_tx(&mut scenario, MAKER);
         {
-            let wallet = test::take_shared<Wallet>(&scenario);
+            let wallet = test::take_shared<Wallet<TEST_TOKEN>>(&scenario);
             assert!(structs::wallet_order_hash(&wallet) == &order_hash, 0);
             assert!(structs::wallet_maker(&wallet) == MAKER, 1);
             assert!(structs::wallet_initial_amount(&wallet) == AMOUNT, 2);
@@ -77,7 +84,7 @@ module escrow::escrow_tests;
         // Create wallet first
         next_tx(&mut scenario, MAKER);
         {
-            let funding = mint_sui(AMOUNT * 2, &mut scenario);
+            let funding = mint_token<TEST_TOKEN>(AMOUNT * 2, &mut scenario);
             escrow_create::create_wallet(
                 order_hash,
                 funding,
@@ -89,7 +96,7 @@ module escrow::escrow_tests;
         // Create source escrow
         next_tx(&mut scenario, RESOLVER);
         {
-            let mut wallet = test::take_shared<Wallet>(&scenario);
+            let mut wallet = test::take_shared<Wallet<TEST_TOKEN>>(&scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -117,7 +124,7 @@ module escrow::escrow_tests;
         // Verify escrow exists
         next_tx(&mut scenario, RESOLVER);
         {
-            let escrow = test::take_shared<EscrowSrc<SUI>>(&scenario);
+            let escrow = test::take_shared<EscrowSrc<TEST_TOKEN>>(&scenario);
             let immutables = structs::get_src_immutables(&escrow);
             
             assert!(structs::get_hashlock(immutables) == &hashlock, 0);
@@ -140,7 +147,7 @@ module escrow::escrow_tests;
         // Create destination escrow (taker deposits for maker)
         next_tx(&mut scenario, TAKER);
         {
-            let token_deposit = mint_sui(AMOUNT, &mut scenario);
+            let token_deposit = mint_token<TEST_TOKEN>(AMOUNT, &mut scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -166,7 +173,7 @@ module escrow::escrow_tests;
         // Verify escrow exists
         next_tx(&mut scenario, TAKER);
         {
-            let escrow = test::take_shared<EscrowDst<SUI>>(&scenario);
+            let escrow = test::take_shared<EscrowDst<TEST_TOKEN>>(&scenario);
             let immutables = structs::get_dst_immutables(&escrow);
             
             assert!(structs::get_order_hash(immutables) == &order_hash, 0);
@@ -189,7 +196,7 @@ module escrow::escrow_tests;
         // Setup: Create wallet and escrow
         next_tx(&mut scenario, MAKER);
         {
-            let funding = mint_sui(AMOUNT * 2, &mut scenario);
+            let funding = mint_token<TEST_TOKEN>(AMOUNT * 2, &mut scenario);
             escrow_create::create_wallet(
                 order_hash,
                 funding,
@@ -200,7 +207,7 @@ module escrow::escrow_tests;
         
         next_tx(&mut scenario, RESOLVER);
         {
-            let mut wallet = test::take_shared<Wallet>(&scenario);
+            let mut wallet = test::take_shared<Wallet<TEST_TOKEN>>(&scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -230,7 +237,7 @@ module escrow::escrow_tests;
         // Withdraw with secret
         next_tx(&mut scenario, RESOLVER);
         {
-            let mut escrow = test::take_shared<EscrowSrc<SUI>>(&scenario);
+            let mut escrow = test::take_shared<EscrowSrc<TEST_TOKEN>>(&scenario);
             
             escrow_withdraw::withdraw_src(
                 &mut escrow,
@@ -256,7 +263,7 @@ module escrow::escrow_tests;
         // Create destination escrow
         next_tx(&mut scenario, TAKER);
         {
-            let token_deposit = mint_sui(AMOUNT, &mut scenario);
+            let token_deposit = mint_token<TEST_TOKEN>(AMOUNT, &mut scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -284,7 +291,7 @@ module escrow::escrow_tests;
         // Withdraw with secret (resolver withdraws, funds go to maker)
         next_tx(&mut scenario, TAKER); // Taker is resolver for dst
         {
-            let mut escrow = test::take_shared<EscrowDst<SUI>>(&scenario);
+            let mut escrow = test::take_shared<EscrowDst<TEST_TOKEN>>(&scenario);
             
             escrow_withdraw::withdraw_dst(
                 &mut escrow,
@@ -309,7 +316,7 @@ module escrow::escrow_tests;
         // Setup escrow
         next_tx(&mut scenario, TAKER);
         {
-            let token_deposit = mint_sui(AMOUNT, &mut scenario);
+            let token_deposit = mint_token<TEST_TOKEN>(AMOUNT, &mut scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -337,7 +344,7 @@ module escrow::escrow_tests;
         // Any resolver can withdraw now
         next_tx(&mut scenario, OTHER_RESOLVER);
         {
-            let mut escrow = test::take_shared<EscrowDst<SUI>>(&scenario);
+            let mut escrow = test::take_shared<EscrowDst<TEST_TOKEN>>(&scenario);
             
             escrow_withdraw::withdraw_dst(
                 &mut escrow,
@@ -360,7 +367,7 @@ module escrow::escrow_tests;
         // Setup wallet and escrow
         next_tx(&mut scenario, MAKER);
         {
-            let funding = mint_sui(AMOUNT * 2, &mut scenario);
+            let funding = mint_token<TEST_TOKEN>(AMOUNT * 2, &mut scenario);
             escrow_create::create_wallet(
                 order_hash,
                 funding,
@@ -371,7 +378,7 @@ module escrow::escrow_tests;
         
         next_tx(&mut scenario, RESOLVER);
         {
-            let mut wallet = test::take_shared<Wallet>(&scenario);
+            let mut wallet = test::take_shared<Wallet<TEST_TOKEN>>(&scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -401,8 +408,8 @@ module escrow::escrow_tests;
         // Cancel escrow (returns funds to maker wallet)
         next_tx(&mut scenario, RESOLVER);
         {
-            let mut escrow = test::take_shared<EscrowSrc<SUI>>(&scenario);
-            let wallet = test::take_shared<Wallet>(&scenario);
+            let mut escrow = test::take_shared<EscrowSrc<TEST_TOKEN>>(&scenario);
+            let wallet = test::take_shared<Wallet<TEST_TOKEN>>(&scenario);
             
             escrow_cancel::cancel_src(
                 &mut escrow,
@@ -427,7 +434,7 @@ module escrow::escrow_tests;
         // Create destination escrow
         next_tx(&mut scenario, TAKER);
         {
-            let token_deposit = mint_sui(AMOUNT, &mut scenario);
+            let token_deposit = mint_token<TEST_TOKEN>(AMOUNT, &mut scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -455,7 +462,7 @@ module escrow::escrow_tests;
         // Cancel escrow (returns funds to taker)
         next_tx(&mut scenario, TAKER);
         {
-            let mut escrow = test::take_shared<EscrowDst<SUI>>(&scenario);
+            let mut escrow = test::take_shared<EscrowDst<TEST_TOKEN>>(&scenario);
             
             escrow_cancel::cancel_dst(
                 &mut escrow,
@@ -480,7 +487,7 @@ module escrow::escrow_tests;
         // Setup escrow
         next_tx(&mut scenario, TAKER);
         {
-            let token_deposit = mint_sui(AMOUNT, &mut scenario);
+            let token_deposit = mint_token<TEST_TOKEN>(AMOUNT, &mut scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -508,7 +515,7 @@ module escrow::escrow_tests;
         // Try to withdraw with wrong secret
         next_tx(&mut scenario, TAKER);
         {
-            let mut escrow = test::take_shared<EscrowDst<SUI>>(&scenario);
+            let mut escrow = test::take_shared<EscrowDst<TEST_TOKEN>>(&scenario);
             let wrong_secret = b"wrong_secret_that_doesnt_match_!";
             
             escrow_withdraw::withdraw_dst(
@@ -533,7 +540,7 @@ module escrow::escrow_tests;
         // Setup escrow
         next_tx(&mut scenario, TAKER);
         {
-            let token_deposit = mint_sui(AMOUNT, &mut scenario);
+            let token_deposit = mint_token<TEST_TOKEN>(AMOUNT, &mut scenario);
             let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
             
             let current_time = clock::timestamp_ms(&clock);
@@ -558,7 +565,7 @@ module escrow::escrow_tests;
         // Try to withdraw immediately (should fail)
         next_tx(&mut scenario, TAKER);
         {
-            let mut escrow = test::take_shared<EscrowDst<SUI>>(&scenario);
+            let mut escrow = test::take_shared<EscrowDst<TEST_TOKEN>>(&scenario);
             
             escrow_withdraw::withdraw_dst(
                 &mut escrow,
@@ -573,43 +580,6 @@ module escrow::escrow_tests;
         clock::destroy_for_testing(clock);
         test::end(scenario);
     }
-    
-    // #[test]
-    // fun test_wallet_withdraw() {
-    //     let (mut scenario, clock, order_hash, _) = setup_test();
-        
-    //     // Create wallet
-    //     next_tx(&mut scenario, MAKER);
-    //     {
-    //         let funding = mint_sui(AMOUNT * 2, &mut scenario);
-    //         escrow_create::create_wallet(
-    //             order_hash,
-    //             funding,
-    //             &clock,
-    //             ctx(&mut scenario)
-    //         );
-    //     };
-        
-    //     // Maker withdraws from wallet
-    //     next_tx(&mut scenario, MAKER);
-    //     {
-    //         let mut wallet = test::take_shared<Wallet>(&scenario);
-            
-    //         escrow_create::withdraw_from_wallet(
-    //             &mut wallet,
-    //             AMOUNT,
-    //             ctx(&mut scenario)
-    //         );
-            
-    //         // Verify remaining balance
-    //         assert!(structs::wallet_balance(&wallet) == AMOUNT, 0);
-            
-    //         test::return_shared(wallet);
-    //     };
-        
-    //     clock::destroy_for_testing(clock);
-    //     test::end(scenario);
-    // }
     
     #[test]
     fun test_hashlock_validation() {
@@ -627,4 +597,79 @@ module escrow::escrow_tests;
         // Test short secret
         let short_secret = b"too_short";
         assert!(!utils::validate_secret_length(&short_secret), 3);
+    }
+
+    // Test with different token types to ensure generics work
+    #[test]
+    fun test_escrow_with_sui_tokens() {
+        let (mut scenario, clock, order_hash, hashlock) = setup_test();
+        
+        // Create destination escrow using SUI tokens
+        next_tx(&mut scenario, TAKER);
+        {
+            let token_deposit = mint_sui(AMOUNT, &mut scenario); // Using SUI as the token type
+            let safety_deposit = mint_sui(SAFETY_DEPOSIT, &mut scenario);
+            
+            let current_time = clock::timestamp_ms(&clock);
+            escrow_create::create_escrow_dst(
+                order_hash,
+                hashlock,
+                MAKER,
+                token_deposit,
+                safety_deposit,
+                current_time + 1000,
+                current_time + 2000,
+                current_time + 3000,
+                current_time + 4000,
+                current_time + 900,
+                current_time + 1900,
+                current_time + 2900,
+                &clock,
+                ctx(&mut scenario)
+            );
+        };
+        
+        // Verify escrow exists with correct type
+        next_tx(&mut scenario, TAKER);
+        {
+            let escrow = test::take_shared<EscrowDst<SUI>>(&scenario);
+            let immutables = structs::get_dst_immutables(&escrow);
+            
+            assert!(structs::get_amount(immutables) == AMOUNT, 0);
+            assert!(structs::get_dst_status(&escrow) == constants::status_active(), 1);
+            
+            test::return_shared(escrow);
+        };
+        
+        clock::destroy_for_testing(clock);
+        test::end(scenario);
+    }
+    
+    // Additional test to ensure wallet works with different token types
+    #[test]
+    fun test_wallet_with_sui_tokens() {
+        let (mut scenario, clock, order_hash, _) = setup_test();
+        
+        next_tx(&mut scenario, MAKER);
+        {
+            let funding = mint_sui(AMOUNT, &mut scenario); // Using SUI as the token type
+            escrow_create::create_wallet(
+                order_hash,
+                funding,
+                &clock,
+                ctx(&mut scenario)
+            );
+        };
+        
+        // Verify wallet exists with correct type
+        next_tx(&mut scenario, MAKER);
+        {
+            let wallet = test::take_shared<Wallet<SUI>>(&scenario);
+            assert!(structs::wallet_initial_amount(&wallet) == AMOUNT, 0);
+            assert!(structs::wallet_is_active(&wallet), 1);
+            test::return_shared(wallet);
+        };
+        
+        clock::destroy_for_testing(clock);
+        test::end(scenario);
     }
