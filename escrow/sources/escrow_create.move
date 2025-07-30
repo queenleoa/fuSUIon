@@ -23,9 +23,9 @@ module escrow::escrow_create;
     /// Maker deposits funds that resolvers can later use to create escrows
     /// @param order_hash - 32-byte unique order identifier
     /// @param funding - SUI coins to deposit in the wallet
-    entry fun create_wallet(
+    entry fun create_wallet<T>(
         order_hash: vector<u8>,
-        funding: Coin<SUI>,
+        funding: Coin<T>,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -71,8 +71,8 @@ module escrow::escrow_create;
     /// @param amount - Amount of SUI to lock
     /// @param safety_deposit - Resolver's safety deposit
     /// @param src_withdrawal...dst_cancellation - Timelock timestamps (see guide above)
-    entry fun create_escrow_src(
-        wallet: &mut Wallet,
+    entry fun create_escrow_src<T>(
+        wallet: &mut Wallet<T>,
         hashlock: vector<u8>,
         taker: address,
         amount: u64,
@@ -118,7 +118,7 @@ module escrow::escrow_create;
             hashlock,
             structs::wallet_maker(wallet),
             taker,
-            string::utf8(b"SUI"),
+            string::utf8(b"wSUI"),
             amount,
             safety_deposit_amount,
             resolver,
@@ -129,7 +129,7 @@ module escrow::escrow_create;
         assert!(utils::validate_immutables(&immutables), e_invalid_amount());
         
         // Create escrow
-        let escrow = structs::create_escrow_src<SUI>(
+        let escrow = structs::create_escrow_src<T>(
             immutables,
             token_balance,
             coin::into_balance(safety_deposit),
@@ -164,11 +164,11 @@ module escrow::escrow_create;
     /// @param token_deposit - SUI tokens to lock
     /// @param safety_deposit - Taker's safety deposit (taker acts as resolver)
     /// @param src_withdrawal...dst_cancellation - Timelock timestamps (see guide above)
-    entry fun create_escrow_dst(
+    entry fun create_escrow_dst<T>(
         order_hash: vector<u8>,
         hashlock: vector<u8>,
         maker: address,
-        token_deposit: Coin<SUI>,
+        token_deposit: Coin<T>,
         safety_deposit: Coin<SUI>,
         // Timelock parameters
         src_withdrawal: u64,
@@ -211,7 +211,7 @@ module escrow::escrow_create;
             hashlock,
             maker,
             taker,
-            string::utf8(b"SUI"),
+            string::utf8(b"wSUI"),
             amount,
             safety_deposit_amount,
             resolver,
@@ -222,7 +222,7 @@ module escrow::escrow_create;
         assert!(utils::validate_immutables(&immutables), e_invalid_amount());
         
         // Create escrow
-        let escrow = structs::create_escrow_dst<SUI>(
+        let escrow = structs::create_escrow_dst<T>(
             immutables,
             coin::into_balance(token_deposit),
             coin::into_balance(safety_deposit),

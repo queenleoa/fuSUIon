@@ -16,12 +16,12 @@ module escrow::structs;
     // Resolvers can pull funds from this wallet to create escrows
     // This enables partial fills - multiple resolvers can create escrows from one wallet
     // The wallet itself is NOT the escrow - it's just a funding source
-    public struct Wallet has key, store {
+    public struct Wallet<phantom T> has key, store {
         id: UID,
         order_hash: vector<u8>,
         maker: address,
         initial_amount: u64,
-        balance: Balance<SUI>,
+        balance: Balance<T>,
         created_at: u64,
         is_active: bool
     }
@@ -59,7 +59,7 @@ module escrow::structs;
     public struct EscrowSrc<phantom T> has key, store {
         id: UID,
         immutables: EscrowImmutables,
-        token_balance: Balance<SUI>,         // Maker's locked tokens (only SUI)
+        token_balance: Balance<T>,         // Maker's locked tokens (only SUI)
         safety_deposit: Balance<SUI>,        // Resolver's safety deposit
         status: u8,                          // Current status (active/withdrawn/cancelled)
     }
@@ -69,7 +69,7 @@ module escrow::structs;
     public struct EscrowDst<phantom T> has key, store {
         id: UID,
         immutables: EscrowImmutables,
-        token_balance: Balance<SUI>,         // Taker's locked tokens (only SUI)
+        token_balance: Balance<T>,         // Taker's locked tokens (only SUI)
         safety_deposit: Balance<SUI>,        // Resolver's safety deposit
         status: u8,                          // Current status (active/withdrawn/cancelled)
     }
@@ -77,14 +77,14 @@ module escrow::structs;
     // ============ Getter Functions ============
 
     // Wallet getters
-    public(package) fun wallet_id(wallet: &Wallet): &UID { &wallet.id }
-    public(package) fun wallet_address(wallet: &Wallet): address {object::uid_to_address(&wallet.id) }
-    public(package) fun wallet_order_hash(wallet: &Wallet): &vector<u8> { &wallet.order_hash }
-    public(package) fun wallet_maker(wallet: &Wallet): address { wallet.maker }
-    public(package) fun wallet_initial_amount(wallet: &Wallet): u64 { wallet.initial_amount }
-    public(package) fun wallet_balance(wallet: &Wallet): u64 { value(&wallet.balance) }
-    public(package) fun wallet_created_at(wallet: &Wallet): u64 { wallet.created_at }
-    public(package) fun wallet_is_active(wallet: &Wallet): bool { wallet.is_active }
+    public(package) fun wallet_id<T>(wallet: &Wallet<T>): &UID { &wallet.id }
+    public(package) fun wallet_address<T>(wallet: &Wallet<T>): address {object::uid_to_address(&wallet.id) }
+    public(package) fun wallet_order_hash<T>(wallet: &Wallet<T>): &vector<u8> { &wallet.order_hash }
+    public(package) fun wallet_maker<T>(wallet: &Wallet<T>): address { wallet.maker }
+    public(package) fun wallet_initial_amount<T>(wallet: &Wallet<T>): u64 { wallet.initial_amount }
+    public(package) fun wallet_balance<T>(wallet: &Wallet<T>): u64 { value(&wallet.balance) }
+    public(package) fun wallet_created_at<T>(wallet: &Wallet<T>): u64 { wallet.created_at }
+    public(package) fun wallet_is_active<T>(wallet: &Wallet<T>): bool { wallet.is_active }
 
     // EscrowImmutables getters
     public(package) fun get_order_hash(immutables: &EscrowImmutables): &vector<u8> { &immutables.order_hash }
@@ -141,14 +141,14 @@ module escrow::structs;
     // multiple mutable borrows
 
     /// Extract both token balance and safety deposit from source escrow
-    public(package) fun extract_all_from_src<T>(escrow: &mut EscrowSrc<T>): (Balance<SUI>, Balance<SUI>) {
+    public(package) fun extract_all_from_src<T>(escrow: &mut EscrowSrc<T>): (Balance<T>, Balance<SUI>) {
         let tokens = withdraw_all(&mut escrow.token_balance);
         let safety_deposit = withdraw_all(&mut escrow.safety_deposit);
         (tokens, safety_deposit)
     }
 
     /// Extract both token balance and safety deposit from destination escrow  
-    public(package) fun extract_all_from_dst<T>(escrow: &mut EscrowDst<T>): (Balance<SUI>, Balance<SUI>) {
+    public(package) fun extract_all_from_dst<T>(escrow: &mut EscrowDst<T>): (Balance<T>, Balance<SUI>) {
         let tokens = withdraw_all(&mut escrow.token_balance);
         let safety_deposit = withdraw_all(&mut escrow.safety_deposit);
         (tokens, safety_deposit)
@@ -157,13 +157,13 @@ module escrow::structs;
     // ============ Constructor Functions for Keyed Structs ============
 
     /// Create a new Wallet. Entry Fn. Call using PTB
-    public(package) fun create_wallet (
+    public(package) fun create_wallet<T>(
         order_hash: vector<u8>,
         maker: address,
-        initial_balance: Balance<SUI>,
+        initial_balance: Balance<T>,
         created_at: u64,
         ctx: &mut TxContext,
-    ): Wallet {
+    ): Wallet<T> {
         Wallet {
             id: object::new(ctx),
             order_hash: order_hash,
@@ -178,7 +178,7 @@ module escrow::structs;
     /// Create a new EscrowSrc object
     public(package) fun create_escrow_src<T>(
         immutables: EscrowImmutables,
-        token_balance: Balance<SUI>,
+        token_balance: Balance<T>,
         safety_deposit: Balance<SUI>,
         ctx: &mut TxContext,
     ): EscrowSrc<T> {
@@ -194,7 +194,7 @@ module escrow::structs;
     /// Create a new EscrowDst object
     public(package) fun create_escrow_dst<T>(
         immutables: EscrowImmutables,
-        token_balance: Balance<SUI>,
+        token_balance: Balance<T>,
         safety_deposit: Balance<SUI>,
         ctx: &mut TxContext,
     ): EscrowDst<T> {
@@ -257,10 +257,10 @@ module escrow::structs;
 
     // Withdraws funds from wallet to create an escrow
     // Returns the balance for the wallet
-    public(package) fun withdraw_from_wallet_for_escrow(
-    wallet: &mut Wallet,
+    public(package) fun withdraw_from_wallet_for_escrow<T>(
+    wallet: &mut Wallet<T>,
     escrow_amount: u64,
-    ): Balance<SUI> {
+    ): Balance<T> {
         // 1. Wallet must still be usable
         assert!(wallet.is_active, e_wallet_inactive());
 
@@ -276,7 +276,7 @@ module escrow::structs;
     }
     
     // Return unused funds to maker when wallet is closed
-    public(package) fun close_vault(wallet: &mut Wallet): Balance<SUI> {
+    public(package) fun close_vault<T>(wallet: &mut Wallet<T>): Balance<T> {
         wallet.is_active = false;
         withdraw_all(&mut wallet.balance)
     }

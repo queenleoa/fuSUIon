@@ -1,7 +1,6 @@
 /// Module: escrow
 module escrow::escrow_withdraw;
 
-    use sui::sui::SUI;
     use sui::coin::{Self};
     use sui::clock::Clock;
     use escrow::structs::{Self, EscrowSrc, EscrowDst};
@@ -21,8 +20,8 @@ module escrow::escrow_withdraw;
     // ============ Withdrawal Functions ============
 
     /// Withdraw from source escrow (reveal secret, funds go to taker)
-    entry fun withdraw_src(
-        escrow: &mut EscrowSrc<SUI>,
+    entry fun withdraw_src<T>(
+        escrow: &mut EscrowSrc<T>,
         secret: vector<u8>,
         clock: &Clock,
         ctx: &mut TxContext,
@@ -84,8 +83,8 @@ module escrow::escrow_withdraw;
     }
 
     /// Withdraw from destination escrow (reveal secret, funds go to maker)
-    entry fun withdraw_dst(
-        escrow: &mut EscrowDst<SUI>,
+    entry fun withdraw_dst<T>(
+        escrow: &mut EscrowDst<T>,
         secret: vector<u8>,
         clock: &Clock,
         ctx: &mut TxContext,

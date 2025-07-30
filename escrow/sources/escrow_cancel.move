@@ -1,7 +1,6 @@
 /// Module: escrow
 module escrow::escrow_cancel;
 
-    use sui::sui::SUI;
     use sui::coin::{Self};
     use sui::clock::Clock;
     use escrow::structs::{Self, EscrowSrc, EscrowDst};
@@ -22,8 +21,8 @@ module escrow::escrow_cancel;
     // multiple mutable borrows of the escrow object
 
     /// Cancel source escrow (refund to maker)
-    entry fun cancel_src(
-        escrow: &mut EscrowSrc<SUI>,
+    entry fun cancel_src<T>(
+        escrow: &mut EscrowSrc<T>,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -79,8 +78,8 @@ module escrow::escrow_cancel;
     }
 
     /// Cancel destination escrow (refund to taker)
-    entry fun cancel_dst(
-        escrow: &mut EscrowDst<SUI>,
+    entry fun cancel_dst<T>(
+        escrow: &mut EscrowDst<T>,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
