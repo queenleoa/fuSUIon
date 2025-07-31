@@ -146,3 +146,40 @@ module escrow::utils;
             // (You could also return stage_public_cancel if you prefer.)
         }
     }
+
+    //dutch auction curve
+    public fun calc_taker_amount(
+            start_time: u64,
+            end_time: u64,
+            taking_amount_start: u128,
+            taking_amount_end: u128,
+            clock: &Clock,
+        ): u128 {
+            // --- sanity ---------------------------------------------------------
+            assert!(start_time < end_time, 0);
+
+            // --- clamp current time into the auction window ---------------------
+            let now_ms = timestamp_ms(clock);
+            let t = if (now_ms < start_time) {
+                start_time
+            } else if (now_ms > end_time) {
+                end_time
+            } else {
+                now_ms
+            };
+
+            // --- cast once; avoids repeated casting clutter ---------------------
+            let t_u128          = t as u128;
+            let start_time_u128 = start_time as u128;
+            let end_time_u128   = end_time as u128;
+
+            // --- linear interpolation ------------------------------------------
+            let elapsed        = t_u128 - start_time_u128;          // (t − T₀)
+            let remaining      = end_time_u128 - t_u128;            // (T₁ − t)
+            let duration       = end_time_u128 - start_time_u128;   // (T₁ − T₀)
+
+            let weighted_start = taking_amount_start * remaining;   // A₀ · (T₁ − t)
+            let weighted_end   = taking_amount_end   * elapsed;     // A₁ · (t − T₀)
+
+            (weighted_start + weighted_end) / duration              // Aₜ
+        }
