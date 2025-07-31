@@ -163,6 +163,10 @@ export class SuiIntegration {
         
         const walletId = (walletCreatedEvent.parsedJson as any).wallet_id;
         console.log('✅ Wallet created at:', walletId);
+
+        // Add delay for object propagation
+        console.log('⏳ Waiting for object to be indexed...');
+        await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
         
         return walletId;
     }
