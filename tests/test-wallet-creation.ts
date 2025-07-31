@@ -37,7 +37,7 @@ async function testWalletCreation() {
         // Create wallet with 1 SUI
         const walletId = await suiIntegration.createWallet(
             orderHash,
-            BigInt(1_000_000_000), // 1 SUI in MIST
+            BigInt(1_000_000), // 1 SUI in MIST
             '0x2::sui::SUI'
         );
         

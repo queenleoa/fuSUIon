@@ -131,20 +131,19 @@ export class SuiIntegration {
         const orderHashBytes = Array.from(Buffer.from(orderHash.slice(2), 'hex'));
         
         // Split coin for funding
-        const [coin] = tx.splitCoins(tx.gas, [amount]);
+        const [fundingCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(amount)]);
         
         // Call create_wallet entry function
         tx.moveCall({
             target: `${this.escrowPackageId}::escrow_create::create_wallet`,
             typeArguments: [tokenType],
             arguments: [
-                tx.pure.vector('u8', orderHashBytes),
-                coin,
+                tx.pure(bcs.vector(bcs.u8()).serialize(orderHashBytes)),
+                fundingCoin,
                 tx.object(SUI_CLOCK_OBJECT_ID)
             ]
         });
         
-        // Execute transaction
         const result = await this.client.signAndExecuteTransaction({
             transaction: tx,
             signer: this.keypair,
@@ -154,9 +153,6 @@ export class SuiIntegration {
             }
         });
         
-        console.log('Transaction result:', result);
-        
-        // Extract wallet address from events
         const walletCreatedEvent = result.events?.find(
             e => e.type.includes('WalletCreated')
         );
@@ -170,7 +166,7 @@ export class SuiIntegration {
         
         return walletId;
     }
-
+    
     /**
      * Create source escrow on Sui (resolver pulls from wallet)
      */
@@ -196,7 +192,7 @@ export class SuiIntegration {
         const tx = new Transaction();
         
         // Split safety deposit from gas
-        const [safetyDepositCoin] = tx.splitCoins(tx.gas, [safetyDeposit]);
+        const [safetyDepositCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(safetyDeposit)]);
         
         // Get current time in milliseconds
         const currentTime = Date.now();
@@ -207,24 +203,23 @@ export class SuiIntegration {
         // Convert taker EVM address to Sui format
         const takerSuiAddress = this.evmAddressToSuiAddress(taker);
         
-        // Call create_escrow_src
+        // Call create_escrow_src with individual timelock parameters
         tx.moveCall({
             target: `${this.escrowPackageId}::escrow_create::create_escrow_src`,
             typeArguments: [tokenType],
             arguments: [
                 tx.object(walletAddress),
-                tx.pure.vector('u8', hashlockBytes),
+                tx.pure(bcs.vector(bcs.u8()).serialize(hashlockBytes)),
                 tx.pure.address(takerSuiAddress),
                 tx.pure.u64(amount),
                 safetyDepositCoin,
-                // Timelocks (add to current time and convert to milliseconds)
-                tx.pure.u64(currentTime + timelocks.srcWithdrawal * 1000),
-                tx.pure.u64(currentTime + timelocks.srcPublicWithdrawal * 1000),
-                tx.pure.u64(currentTime + timelocks.srcCancellation * 1000),
-                tx.pure.u64(currentTime + timelocks.srcPublicCancellation * 1000),
-                tx.pure.u64(currentTime + timelocks.dstWithdrawal * 1000),
-                tx.pure.u64(currentTime + timelocks.dstPublicWithdrawal * 1000),
-                tx.pure.u64(currentTime + timelocks.dstCancellation * 1000),
+                tx.pure.u64(BigInt(currentTime + timelocks.srcWithdrawal * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.srcPublicWithdrawal * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.srcCancellation * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.srcPublicCancellation * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.dstWithdrawal * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.dstPublicWithdrawal * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.dstCancellation * 1000)),
                 tx.object(SUI_CLOCK_OBJECT_ID)
             ]
         });
@@ -250,5 +245,158 @@ export class SuiIntegration {
         console.log('✅ Source escrow created at:', escrowId);
         
         return escrowId;
+    }
+    
+    /**
+     * Create destination escrow on Sui
+     */
+    async createDstEscrow(
+        orderHash: string,
+        hashlock: string,
+        maker: string, // EVM address receiving on Sui
+        amount: bigint,
+        safetyDeposit: bigint,
+        timelocks: {
+            srcWithdrawal: number,
+            srcPublicWithdrawal: number,
+            srcCancellation: number,
+            srcPublicCancellation: number,
+            dstWithdrawal: number,
+            dstPublicWithdrawal: number,
+            dstCancellation: number
+        },
+        tokenType: string = '0x2::sui::SUI'
+    ): Promise<string> {
+        console.log('Creating destination escrow...');
+        
+        const tx = new Transaction();
+        
+        // Split coins for token deposit and safety deposit
+        const [tokenCoin, safetyDepositCoin] = tx.splitCoins(
+            tx.gas,
+            [tx.pure.u64(amount), tx.pure.u64(safetyDeposit)]
+        );
+        
+        const currentTime = Date.now();
+        
+        // Convert to bytes arrays
+        const orderHashBytes = Array.from(Buffer.from(orderHash.slice(2), 'hex'));
+        const hashlockBytes = Array.from(Buffer.from(hashlock.slice(2), 'hex'));
+        
+        // Convert maker EVM address to Sui format
+        const makerSuiAddress = this.evmAddressToSuiAddress(maker);
+        
+        tx.moveCall({
+            target: `${this.escrowPackageId}::escrow_create::create_escrow_dst`,
+            typeArguments: [tokenType],
+            arguments: [
+                tx.pure(bcs.vector(bcs.u8()).serialize(orderHashBytes)),
+                tx.pure(bcs.vector(bcs.u8()).serialize(hashlockBytes)),
+                tx.pure.address(makerSuiAddress),
+                tokenCoin,
+                safetyDepositCoin,
+                tx.pure.u64(BigInt(currentTime + timelocks.srcWithdrawal * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.srcPublicWithdrawal * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.srcCancellation * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.srcPublicCancellation * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.dstWithdrawal * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.dstPublicWithdrawal * 1000)),
+                tx.pure.u64(BigInt(currentTime + timelocks.dstCancellation * 1000)),
+                tx.object(SUI_CLOCK_OBJECT_ID)
+            ]
+        });
+        
+        const result = await this.client.signAndExecuteTransaction({
+            transaction: tx,
+            signer: this.keypair,
+            options: {
+                showEffects: true,
+                showEvents: true
+            }
+        });
+        
+        const escrowCreatedEvent = result.events?.find(
+            e => e.type.includes('EscrowCreated')
+        );
+        
+        if (!escrowCreatedEvent || !escrowCreatedEvent.parsedJson) {
+            throw new Error('Failed to create dst escrow - no event emitted');
+        }
+        
+        const escrowId = (escrowCreatedEvent.parsedJson as any).escrow_id;
+        console.log('✅ Destination escrow created at:', escrowId);
+        
+        return escrowId;
+    }
+    
+    /**
+     * Withdraw from escrow using secret
+     */
+    async withdraw(
+        escrowAddress: string,
+        escrowType: 'src' | 'dst',
+        secret: string,
+        tokenType: string = '0x2::sui::SUI'
+    ): Promise<void> {
+        console.log(`Withdrawing from ${escrowType} escrow ${escrowAddress}...`);
+        
+        const tx = new Transaction();
+        
+        // Convert secret to bytes
+        const secretBytes = Array.from(Buffer.from(secret.slice(2), 'hex'));
+        
+        tx.moveCall({
+            target: `${this.escrowPackageId}::escrow_withdraw::withdraw_${escrowType}`,
+            typeArguments: [tokenType],
+            arguments: [
+                tx.object(escrowAddress),
+                tx.pure(bcs.vector(bcs.u8()).serialize(secretBytes)),
+                tx.object(SUI_CLOCK_OBJECT_ID)
+            ]
+        });
+        
+        const result = await this.client.signAndExecuteTransaction({
+            transaction: tx,
+            signer: this.keypair,
+            options: {
+                showEffects: true,
+                showEvents: true
+            }
+        });
+        
+        console.log('✅ Withdrawal successful:', result.digest);
+    }
+    
+    /**
+     * Cancel escrow
+     */
+    async cancel(
+        escrowAddress: string,
+        escrowType: 'src' | 'dst',
+        tokenType: string = '0x2::sui::SUI'
+    ): Promise<void> {
+        console.log(`Cancelling ${escrowType} escrow ${escrowAddress}...`);
+        
+        const tx = new Transaction();
+        
+        tx.moveCall({
+            target: `${this.escrowPackageId}::escrow_cancel::cancel_${escrowType}`,
+            typeArguments: [tokenType],
+            arguments: [
+                tx.object(escrowAddress),
+                tx.object(SUI_CLOCK_OBJECT_ID)
+            ]
+        });
+        
+        const result = await this.client.signAndExecuteTransaction({
+            transaction: tx,
+            signer: this.keypair,
+            options: {
+                showEffects: true,
+                showEvents: true
+            }
+        });
+        
+        console.log('✅ Cancellation successful:', result.digest);
     }
 }
