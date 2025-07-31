@@ -115,6 +115,13 @@ export class SuiIntegration {
         return this.keypair.getPublicKey().toSuiAddress();
     }
 
+    async getBalance(address: string): Promise<bigint> {
+        const balance = await this.client.getBalance({
+            owner: address
+        });
+        return BigInt(balance.totalBalance);
+    }
+
     /**
      * Create a pre-funded wallet for Sui as source chain
      */
