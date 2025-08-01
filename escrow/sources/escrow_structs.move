@@ -8,8 +8,7 @@ module escrow::structs;
         status_active, 
         e_insufficient_balance, 
         e_wallet_inactive
-        };
-   
+        };   
 
 // ======== Wallet (Sui as source chain) ========
     // Design rationale: wallet is a pre-funded wallet that makers create
@@ -33,7 +32,7 @@ module escrow::structs;
         dst_safety_deposit_amount: u64, // safety deposit amount in ETH (paid by resolver)
         allow_partial_fills: bool, // whether this wallet allows partial fills
         parts_amount: u8, // amount of parts an order is split into (n+1 secrets for partial fill)
-        used_indices: vector<u8>, // indices of used parts
+        last_used_index: u8, // indices of used parts
         balance: Balance<T>,
         created_at: u64,
         is_active: bool
@@ -91,10 +90,22 @@ module escrow::structs;
 
     // Wallet getters
     public(package) fun wallet_id<T>(wallet: &Wallet<T>): &UID { &wallet.id }
-    public(package) fun wallet_address<T>(wallet: &Wallet<T>): address {object::uid_to_address(&wallet.id) }
+    public(package) fun wallet_address<T>(wallet: &Wallet<T>): address { object::uid_to_address(&wallet.id) }
     public(package) fun wallet_order_hash<T>(wallet: &Wallet<T>): &vector<u8> { &wallet.order_hash }
+    public(package) fun wallet_salt<T>(wallet: &Wallet<T>): u256 { wallet.salt }
     public(package) fun wallet_maker<T>(wallet: &Wallet<T>): address { wallet.maker }
-    public(package) fun wallet_initial_amount<T>(wallet: &Wallet<T>): u64 { wallet.initial_amount }
+    public(package) fun wallet_maker_asset<T>(wallet: &Wallet<T>): &String { &wallet.maker_asset }
+    public(package) fun wallet_taker_asset<T>(wallet: &Wallet<T>): &String { &wallet.taker_asset }
+    public(package) fun wallet_making_amount<T>(wallet: &Wallet<T>): u64 { wallet.making_amount }
+    public(package) fun wallet_taking_amount<T>(wallet: &Wallet<T>): u64 { wallet.taking_amount }
+    public(package) fun wallet_duration<T>(wallet: &Wallet<T>): u64 { wallet.duration }
+    public(package) fun wallet_hashlock<T>(wallet: &Wallet<T>): &vector<u8> { &wallet.hashlock }
+    public(package) fun wallet_timelocks<T>(wallet: &Wallet<T>): &Timelocks { &wallet.timelocks }
+    public(package) fun wallet_src_safety_deposit<T>(wallet: &Wallet<T>): u64 { wallet.src_safety_deposit_amount }
+    public(package) fun wallet_dst_safety_deposit<T>(wallet: &Wallet<T>): u64 { wallet.dst_safety_deposit_amount }
+    public(package) fun wallet_allow_partial_fills<T>(wallet: &Wallet<T>): bool { wallet.allow_partial_fills }
+    public(package) fun wallet_parts_amount<T>(wallet: &Wallet<T>): u8 { wallet.parts_amount }
+    public(package) fun wallet_last_used_index<T>(wallet: &Wallet<T>): u8 { wallet.last_used_index }
     public(package) fun wallet_balance<T>(wallet: &Wallet<T>): u64 { value(&wallet.balance) }
     public(package) fun wallet_created_at<T>(wallet: &Wallet<T>): u64 { wallet.created_at }
     public(package) fun wallet_is_active<T>(wallet: &Wallet<T>): bool { wallet.is_active }
@@ -107,11 +118,9 @@ module escrow::structs;
     public(package) fun get_token_type(immutables: &EscrowImmutables): &String { &immutables.token_type }
     public(package) fun get_amount(immutables: &EscrowImmutables): u64 { immutables.amount }
     public(package) fun get_safety_deposit_amount(immutables: &EscrowImmutables): u64 { immutables.safety_deposit_amount }
-    public(package) fun get_resolver(immutables: &EscrowImmutables): address { immutables.resolver }
     public(package) fun get_timelocks(immutables: &EscrowImmutables): &Timelocks { &immutables.timelocks }
 
     // Timelocks getters
-    public(package) fun get_deployed_at(timelocks: &Timelocks): u64 { timelocks.deployed_at }
     public(package) fun get_src_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_withdrawal }
     public(package) fun get_src_public_withdrawal_time(timelocks: &Timelocks): u64 { timelocks.src_public_withdrawal }
     public(package) fun get_src_cancellation_time(timelocks: &Timelocks): u64 { timelocks.src_cancellation }
@@ -126,6 +135,7 @@ module escrow::structs;
     public(package) fun get_src_immutables<T>(escrow: &EscrowSrc<T>): &EscrowImmutables { &escrow.immutables }
     public(package) fun get_src_token_balance<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.token_balance) }
     public(package) fun get_src_safety_deposit<T>(escrow: &EscrowSrc<T>): u64 { value(&escrow.safety_deposit) }
+    public(package) fun get_src_created_at<T>(escrow: &EscrowSrc<T>): u64 { escrow.created_at }
     public(package) fun get_src_status<T>(escrow: &EscrowSrc<T>): u8 { escrow.status }
 
     // EscrowDst getters
@@ -134,9 +144,19 @@ module escrow::structs;
     public(package) fun get_dst_immutables<T>(escrow: &EscrowDst<T>): &EscrowImmutables { &escrow.immutables }
     public(package) fun get_dst_token_balance<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.token_balance) }
     public(package) fun get_dst_safety_deposit<T>(escrow: &EscrowDst<T>): u64 { value(&escrow.safety_deposit) }
+    public(package) fun get_dst_created_at<T>(escrow: &EscrowDst<T>): u64 { escrow.created_at }
     public(package) fun get_dst_status<T>(escrow: &EscrowDst<T>): u8 { escrow.status }
 
     // ============ Setter/Mutator Functions ============
+
+    // Wallet mutators
+    public(package) fun wallet_add_used_index<T>(wallet: &mut Wallet<T>, index: u8) {
+        wallet.last_used_index = index;
+    }
+
+    public(package) fun wallet_set_active<T>(wallet: &mut Wallet<T>, is_active: bool) {
+        wallet.is_active = is_active;
+    }
 
     // Escrow status mutators
     public(package) fun set_src_status<T>(escrow: &mut EscrowSrc<T>, status: u8) {
@@ -172,27 +192,53 @@ module escrow::structs;
     /// Create a new Wallet. Entry Fn. Call using PTB
     public(package) fun create_wallet<T>(
         order_hash: vector<u8>,
+        salt: u256,
         maker: address,
+        maker_asset: String,
+        taker_asset: String,
+        making_amount: u64,
+        taking_amount: u64,
+        duration: u64,
+        hashlock: vector<u8>,
+        timelocks: Timelocks,
+        src_safety_deposit_amount: u64,
+        dst_safety_deposit_amount: u64,
+        allow_partial_fills: bool,
+        parts_amount: u8,
         initial_balance: Balance<T>,
         created_at: u64,
         ctx: &mut TxContext,
     ): Wallet<T> {
         Wallet {
             id: object::new(ctx),
-            order_hash: order_hash,
-            maker: maker,
-            initial_amount: value(&initial_balance),
+            order_hash,
+            salt,
+            maker,
+            maker_asset,
+            taker_asset,
+            making_amount,
+            taking_amount,
+            duration,
+            hashlock,
+            timelocks,
+            src_safety_deposit_amount,
+            dst_safety_deposit_amount,
+            allow_partial_fills,
+            parts_amount,
+            last_used_index: 0,
             balance: initial_balance,
-            created_at: created_at,
+            created_at,
             is_active: true,
         }
     }
+
 
     /// Create a new EscrowSrc object
     public(package) fun create_escrow_src<T>(
         immutables: EscrowImmutables,
         token_balance: Balance<T>,
         safety_deposit: Balance<SUI>,
+        created_at: u64,
         ctx: &mut TxContext,
     ): EscrowSrc<T> {
         EscrowSrc {
@@ -200,6 +246,7 @@ module escrow::structs;
             immutables,
             token_balance,
             safety_deposit,
+            created_at,
             status: status_active(),
         }
     }
@@ -209,6 +256,7 @@ module escrow::structs;
         immutables: EscrowImmutables,
         token_balance: Balance<T>,
         safety_deposit: Balance<SUI>,
+        created_at: u64,
         ctx: &mut TxContext,
     ): EscrowDst<T> {
         EscrowDst {
@@ -216,6 +264,7 @@ module escrow::structs;
             immutables,
             token_balance,
             safety_deposit,
+            created_at,
             status: status_active(),
         }
     }
@@ -230,7 +279,6 @@ module escrow::structs;
         token_type: String,
         amount: u64,
         safety_deposit_amount: u64,
-        resolver: address,
         timelocks: Timelocks,
     ): EscrowImmutables {
         EscrowImmutables {
@@ -241,13 +289,11 @@ module escrow::structs;
             token_type,
             amount,
             safety_deposit_amount,
-            resolver,
             timelocks,
         }
     }
 
     public(package) fun create_timelocks(
-        deployed_at: u64,
         src_withdrawal: u64,
         src_public_withdrawal: u64,
         src_cancellation: u64,
@@ -257,7 +303,6 @@ module escrow::structs;
         dst_cancellation: u64,
     ): Timelocks {
         Timelocks {
-            deployed_at,
             src_withdrawal,
             src_public_withdrawal,
             src_cancellation,
@@ -277,7 +322,7 @@ module escrow::structs;
         // 1. Wallet must still be usable
         assert!(wallet.is_active, e_wallet_inactive());
 
-        // 2. Must hold enough SUI
+        // 2. Must hold enough tokens
         assert!(
             value(&wallet.balance) >= escrow_amount,
             e_insufficient_balance()
@@ -289,7 +334,7 @@ module escrow::structs;
     }
     
     // Return unused funds to maker when wallet is closed
-    public(package) fun close_vault<T>(wallet: &mut Wallet<T>): Balance<T> {
+    public(package) fun close_wallet<T>(wallet: &mut Wallet<T>): Balance<T> {
         wallet.is_active = false;
         withdraw_all(&mut wallet.balance)
     }
@@ -304,6 +349,7 @@ module escrow::structs;
             immutables: _, 
             token_balance, 
             safety_deposit, 
+            created_at:_,
             status: _
         } = escrow;
         
@@ -318,7 +364,8 @@ module escrow::structs;
             id, 
             immutables: _, 
             token_balance, 
-            safety_deposit, 
+            safety_deposit,
+            created_at:_, 
             status: _
         } = escrow;
         

@@ -18,6 +18,10 @@ module escrow::constants;
     public fun stage_public_cancel(): u8 { 4 } //for sui as a source chain
     public fun stage_rescue(): u8 { 5 }
 
+// ============ Rescue Delay ============
+
+    public fun rescue_delay_period(): u64 { 3600 } // 0.001 SUI
+
 // ============ Safety Deposit ============
 
     /// Minimum safety deposit amount (in MIST)
