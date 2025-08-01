@@ -14,6 +14,9 @@ module escrow::escrow_create;
         e_invalid_hashlock,
         e_invalid_order_hash,
         e_safety_deposit_too_low,
+        e_auction_violated,
+        e_secret_index_used,
+        e_invalid_merkle_proof,
         min_safety_deposit,
     };
 
@@ -21,25 +24,78 @@ module escrow::escrow_create;
 
     /// Create a pre-funded wallet for Sui->EVM swaps
     /// Maker deposits funds that resolvers can later use to create escrows
-    /// @param order_hash - 32-byte unique order identifier
-    /// @param funding - SUI coins to deposit in the wallet
     entry fun create_wallet<T>(
         order_hash: vector<u8>,
+        salt: u256,
+        maker_asset: string::String,
+        taker_asset: string::String,
+        making_amount: u64,
+        taking_amount: u64,
+        duration: u64,
+        hashlock: vector<u8>, // merkle root for partial fills or keccak256(secret) for full fill
+        src_safety_deposit_amount: u64,
+        dst_safety_deposit_amount: u64,
+        allow_partial_fills: bool,
+        parts_amount: u8,
         funding: Coin<T>,
+        // Relative timelock parameters (in milliseconds from creation)
+        src_withdrawal: u64,
+        src_public_withdrawal: u64,
+        src_cancellation: u64,
+        src_public_cancellation: u64,
+        dst_withdrawal: u64,
+        dst_public_withdrawal: u64,
+        dst_cancellation: u64,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
         let maker = tx_context::sender(ctx);
         let initial_amount = coin::value(&funding);
         
-        // Validate order hash
+        // Create timelocks struct
+        let timelocks = structs::create_timelocks(
+            src_withdrawal,
+            src_public_withdrawal,
+            src_cancellation,
+            src_public_cancellation,
+            dst_withdrawal,
+            dst_public_withdrawal,
+            dst_cancellation,
+        );
+        
+        // Validate inputs
         assert!(vector::length(&order_hash) == 32, e_invalid_order_hash());
-        assert!(initial_amount > 0, e_invalid_amount());
+        assert!(vector::length(&hashlock) == 32, e_invalid_hashlock());
+        assert!(initial_amount == making_amount, e_invalid_amount()); // Funding must match making amount
+        assert!(making_amount > 0, e_invalid_amount());
+        assert!(taking_amount > 0, e_invalid_amount());
+        assert!(duration > 0, e_invalid_amount());
+        assert!(utils::is_valid_timelocks(&timelocks), e_invalid_timelock());
+        
+        // If partial fills enabled, validate parts amount
+        if (allow_partial_fills) {
+            assert!(parts_amount > 1, e_invalid_amount());
+        } else {
+            // For full fills, parts_amount should be 0
+            assert!(parts_amount == 0, e_invalid_amount());
+        };
         
         // Create wallet with funding
         let wallet = structs::create_wallet(
             order_hash,
+            salt,
             maker,
+            maker_asset,
+            taker_asset,
+            making_amount,
+            taking_amount,
+            duration,
+            hashlock, //this is merkle root for partial fills
+            timelocks,
+            src_safety_deposit_amount,
+            dst_safety_deposit_amount,
+            allow_partial_fills,
+            parts_amount,
             coin::into_balance(funding),
             sui::clock::timestamp_ms(clock),
             ctx,
@@ -52,8 +108,19 @@ module escrow::escrow_create;
         events::wallet_created(
             wallet_address,
             order_hash,
+            salt,
             maker,
-            initial_amount,
+            maker_asset,
+            taker_asset,
+            making_amount,
+            taking_amount,
+            duration,
+            hashlock,
+            timelocks,
+            src_safety_deposit_amount,
+            dst_safety_deposit_amount,
+            allow_partial_fills,
+            parts_amount,
             sui::clock::timestamp_ms(clock),
         );
         
@@ -65,74 +132,84 @@ module escrow::escrow_create;
 
     /// Create source chain escrow (Sui as source)
     /// Resolver pulls funds from pre-funded wallet
-    /// @param wallet - Pre-funded wallet to pull funds from
-    /// @param hashlock - 32-byte keccak256(secret) for this specific fill
-    /// @param taker - Address receiving tokens on source chain
-    /// @param amount - Amount of SUI to lock
-    /// @param safety_deposit - Resolver's safety deposit
-    /// @param src_withdrawal...dst_cancellation - Timelock timestamps (see guide above)
+    /// For partial fills: resolver must provide valid merkle proof
     entry fun create_escrow_src<T>(
         wallet: &mut Wallet<T>,
-        hashlock: vector<u8>,
+        secret_hashlock: vector<u8>, // keccak256(secret) for this specific fill
+        secret_index: u8, // Index of secret being used (for partial fills)
+        merkle_proof: vector<vector<u8>>, // Merkle proof (empty vector for full fills)
         taker: address,
-        amount: u64,
+        making_amount: u64, // Amount taker wants to fill from maker
+        taking_amount: u64, // Amount taker must provide
         safety_deposit: Coin<SUI>,
-        // Timelock parameters
-        src_withdrawal: u64,
-        src_public_withdrawal: u64,
-        src_cancellation: u64,
-        src_public_cancellation: u64,
-        dst_withdrawal: u64,
-        dst_public_withdrawal: u64,
-        dst_cancellation: u64,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
-        let resolver = tx_context::sender(ctx);
         let safety_deposit_amount = coin::value(&safety_deposit);
         
-        // Create timelocks struct
-        let timelocks = structs::create_timelocks(
-            sui::clock::timestamp_ms(clock), // deployed_at
-            src_withdrawal,
-            src_public_withdrawal,
-            src_cancellation,
-            src_public_cancellation,
-            dst_withdrawal,
-            dst_public_withdrawal,
-            dst_cancellation,
-        );
+        // Basic validations
+        assert!(making_amount > 0, e_invalid_amount());
+        assert!(taking_amount > 0, e_invalid_amount());
+        assert!(safety_deposit_amount >= structs::wallet_src_safety_deposit(wallet), e_safety_deposit_too_low());
+        assert!(vector::length(&secret_hashlock) == 32, e_invalid_hashlock());
         
-        // Validate inputs
-        assert!(amount > 0, e_invalid_amount());
-        assert!(safety_deposit_amount >= min_safety_deposit(), e_safety_deposit_too_low());
-        assert!(vector::length(&hashlock) == 32, e_invalid_hashlock());
-        assert!(utils::is_valid_timelocks(&timelocks), e_invalid_timelock());
+        // Validate wallet can fulfill
+        assert!(utils::can_fulfill_amount(wallet, making_amount), e_invalid_amount());
+        
+        // Dutch auction validation: Ensure taking amount matches auction curve
+        let expected_taking_amount = utils::get_taking_amount(wallet, making_amount, clock);
+        assert!(taking_amount >= expected_taking_amount, e_auction_violated());
+        
+        // Partial fill validations
+        if (structs::wallet_allow_partial_fills(wallet)) {
+            // Validate secret index
+            assert!(utils::validate_partial_fill_index(wallet, secret_index, making_amount), e_secret_index_used());
+            
+            // Verify merkle proof
+            let wallet_merkle_root = structs::wallet_hashlock(wallet);
+            assert!(
+                utils::verify_merkle_proof(&secret_hashlock, wallet_merkle_root, &merkle_proof), 
+                e_invalid_merkle_proof()
+            );
+            
+            // Update last used index
+            structs::wallet_add_used_index(wallet, secret_index);
+        } else {
+            // For full fills, secret_index must be 0 and no merkle proof needed
+            assert!(secret_index == 0, e_invalid_amount());
+            assert!(vector::length(&merkle_proof) == 0, e_invalid_merkle_proof());
+            
+            // Full fill must take entire wallet balance
+            assert!(making_amount == structs::wallet_balance(wallet), e_invalid_amount());
+            
+            // Deactivate wallet after full fill
+            structs::wallet_set_active(wallet, false);
+        };
         
         // Pull funds from wallet
-        let token_balance = structs::withdraw_from_wallet_for_escrow(wallet, amount);
+        let token_balance = structs::withdraw_from_wallet_for_escrow(wallet, making_amount);
         
-        // Create immutables
+        // Create immutables with wallet's timelocks
         let immutables = structs::create_escrow_immutables(
             *structs::wallet_order_hash(wallet),
-            hashlock,
+            secret_hashlock, // Specific hashlock for this fill
             structs::wallet_maker(wallet),
             taker,
             string::utf8(b"wSUI"),
-            amount,
+            making_amount,
             safety_deposit_amount,
-            resolver,
-            timelocks,
+            *structs::wallet_timelocks(wallet),
         );
         
         // Validate immutables
         assert!(utils::validate_immutables(&immutables), e_invalid_amount());
         
-        // Create escrow
+        // Create escrow with current timestamp
         let escrow = structs::create_escrow_src<T>(
             immutables,
             token_balance,
             coin::into_balance(safety_deposit),
+            sui::clock::timestamp_ms(clock),
             ctx,
         );
         
@@ -143,13 +220,13 @@ module escrow::escrow_create;
         events::escrow_created(
             escrow_address,
             *structs::wallet_order_hash(wallet),
-            hashlock,
-            taker,
+            secret_hashlock,
             structs::wallet_maker(wallet),
-            amount,
+            taker,
+            making_amount,
             safety_deposit_amount,
-            resolver,
             sui::clock::timestamp_ms(clock),
+            secret_index,
         );
         
         // Share the escrow
@@ -158,19 +235,14 @@ module escrow::escrow_create;
 
     /// Create destination chain escrow (Sui as destination)
     /// Taker deposits funds directly
-    /// @param order_hash - 32-byte unique order identifier
-    /// @param hashlock - 32-byte keccak256(secret) for this specific fill
-    /// @param maker - Address receiving tokens on destination chain
-    /// @param token_deposit - SUI tokens to lock
-    /// @param safety_deposit - Taker's safety deposit (taker acts as resolver)
-    /// @param src_withdrawal...dst_cancellation - Timelock timestamps (see guide above)
+    /// No merkle proof needed - hashlock already determined on EVM
     entry fun create_escrow_dst<T>(
         order_hash: vector<u8>,
-        hashlock: vector<u8>,
+        hashlock: vector<u8>, // Specific hashlock for this fill
         maker: address,
         token_deposit: Coin<T>,
         safety_deposit: Coin<SUI>,
-        // Timelock parameters
+        // Relative timelock parameters (in milliseconds)
         src_withdrawal: u64,
         src_public_withdrawal: u64,
         src_cancellation: u64,
@@ -182,13 +254,11 @@ module escrow::escrow_create;
         ctx: &mut TxContext,
     ) {
         let taker = tx_context::sender(ctx);
-        let resolver = tx_context::sender(ctx); // In dst escrow, taker acts as resolver
         let amount = coin::value(&token_deposit);
         let safety_deposit_amount = coin::value(&safety_deposit);
         
         // Create timelocks struct
         let timelocks = structs::create_timelocks(
-            // deployed_at
             src_withdrawal,
             src_public_withdrawal,
             src_cancellation,
@@ -201,7 +271,7 @@ module escrow::escrow_create;
         // Validate inputs
         assert!(amount > 0, e_invalid_amount());
         assert!(safety_deposit_amount >= min_safety_deposit(), e_safety_deposit_too_low());
-        assert!(vector::length(&order_hash) == 32, e_invalid_hashlock());
+        assert!(vector::length(&order_hash) == 32, e_invalid_order_hash());
         assert!(vector::length(&hashlock) == 32, e_invalid_hashlock());
         assert!(utils::is_valid_timelocks(&timelocks), e_invalid_timelock());
         
@@ -214,35 +284,35 @@ module escrow::escrow_create;
             string::utf8(b"wSUI"),
             amount,
             safety_deposit_amount,
-            resolver,
             timelocks,
         );
         
         // Validate immutables
         assert!(utils::validate_immutables(&immutables), e_invalid_amount());
         
-        // Create escrow
+        // Create escrow with current timestamp
         let escrow = structs::create_escrow_dst<T>(
             immutables,
             coin::into_balance(token_deposit),
             coin::into_balance(safety_deposit),
+            sui::clock::timestamp_ms(clock),
             ctx,
         );
         
         // Get escrow address for event
         let escrow_address = structs::get_dst_address(&escrow);
         
-        // Emit creation event
+        // Emit creation event (secret_index 0 for destination escrows)
         events::escrow_created(
             escrow_address,
             order_hash,
             hashlock,
-            taker,
             maker,
+            taker,
             amount,
             safety_deposit_amount,
-            resolver,
             sui::clock::timestamp_ms(clock),
+            0, // No secret index for destination escrows
         );
         
         // Share the escrow

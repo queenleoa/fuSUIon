@@ -334,16 +334,46 @@ module escrow::structs;
     }
     
     // Return unused funds to maker when wallet is closed
-    public(package) fun close_wallet<T>(wallet: &mut Wallet<T>): Balance<T> {
-        wallet.is_active = false;
-        withdraw_all(&mut wallet.balance)
+    public(package) fun destroy_wallet<T>(wallet: Wallet<T>, maker: address, ctx: &mut TxContext,) {
+        let Wallet {
+            id,
+            order_hash: _,
+            salt: _,
+            maker: _,
+            maker_asset: _,
+            taker_asset: _,
+            making_amount: _,
+            taking_amount: _,
+            duration: _,
+            hashlock: _,
+            timelocks: _,
+            src_safety_deposit_amount: _,
+            dst_safety_deposit_amount: _,
+            allow_partial_fills: _,
+            parts_amount: _,
+            last_used_index: _,
+            balance,
+            created_at: _,
+            is_active: _,
+        } = wallet;
+
+        if (value(&balance) > 0) {
+            transfer::public_transfer(sui::coin::from_balance(balance, ctx), maker);
+        } else {
+            destroy_zero(balance);
+        };
+        
+        // Delete the wallet object - caller gets storage rebate
+        object::delete(id);
+        
     }
 
     // ============ Object Cleanup Functions ============
 
 
     /// Destroy EscrowSrc after lifecycle is complete
-    public(package) fun destroy_src_escrow<T>(escrow: EscrowSrc<T>) {
+    #[allow(lint(self_transfer))]
+    public(package) fun destroy_src_escrow<T>(escrow: EscrowSrc<T>, maker: address, ctx: &mut TxContext,) {
         let EscrowSrc { 
             id, 
             immutables: _, 
@@ -352,14 +382,26 @@ module escrow::structs;
             created_at:_,
             status: _
         } = escrow;
+
+        let caller = tx_context::sender(ctx);
         
-        destroy_zero(token_balance);
-        destroy_zero(safety_deposit);
+         if (value(&token_balance) > 0) {
+            transfer::public_transfer(sui::coin::from_balance(token_balance, ctx), maker);
+        } else {
+            destroy_zero(token_balance);
+        };
+        
+        if (value(&safety_deposit) > 0) {
+            transfer::public_transfer(sui::coin::from_balance(safety_deposit, ctx), caller);
+        } else {
+            destroy_zero(safety_deposit);
+        };
         object::delete(id);
     }
 
     /// Destroy EscrowDst after lifecycle is complete
-    public(package) fun destroy_dst_escrow<T>(escrow: EscrowDst<T>) {
+    #[allow(lint(self_transfer))]
+    public(package) fun destroy_dst_escrow<T>(escrow: EscrowDst<T>, taker: address, ctx: &mut TxContext,) {
         let EscrowDst { 
             id, 
             immutables: _, 
@@ -369,8 +411,19 @@ module escrow::structs;
             status: _
         } = escrow;
         
-        destroy_zero(token_balance);
-        destroy_zero(safety_deposit);
+        let caller = tx_context::sender(ctx);
+        
+         if (value(&token_balance) > 0) {
+            transfer::public_transfer(sui::coin::from_balance(token_balance, ctx), taker);
+        } else {
+            destroy_zero(token_balance);
+        };
+        
+        if (value(&safety_deposit) > 0) {
+            transfer::public_transfer(sui::coin::from_balance(safety_deposit, ctx), caller);
+        } else {
+            destroy_zero(safety_deposit);
+        };
         object::delete(id);
     }
 
