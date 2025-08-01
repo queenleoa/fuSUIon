@@ -40,7 +40,7 @@ module escrow::escrow_cancel;
 
             // Authorisation by stage
             if (current_stage == stage_resolver_exclusive_cancel()) {
-                assert!(caller == structs::get_resolver(imm), e_unauthorised());
+                assert!(caller == structs::get_taker(imm), e_unauthorised());
             } else if (current_stage == stage_public_cancel()) {
                 // anyone can cancel
             } else {
@@ -99,7 +99,7 @@ module escrow::escrow_cancel;
             assert!(current_stage >= stage_resolver_exclusive_cancel(), e_not_cancellable());
 
             // Only the assigned resolver may cancel
-            assert!(caller == structs::get_resolver(imm), e_unauthorised());
+            assert!(caller == structs::get_taker(imm), e_unauthorised());
 
             // Bind values to locals, then return tuple  (❗ no semicolon)
             let maker_local      = structs::get_maker(imm);

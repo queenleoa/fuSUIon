@@ -5,7 +5,6 @@ module escrow::utils;
     use escrow::structs::{
         EscrowImmutables, 
         Timelocks, 
-        get_deployed_at,
         get_src_withdrawal_time,
         get_src_public_withdrawal_time,
         get_src_cancellation_time,
@@ -41,8 +40,8 @@ module escrow::utils;
         
         // Validate addresses are not zero
         if (structs::get_maker(immutables) == @0x0 || 
-            structs::get_taker(immutables) == @0x0 ||
-            structs::get_resolver(immutables) == @0x0) {
+            structs::get_taker(immutables) == @0x0
+            ) {
             return false
         };
         
@@ -112,7 +111,7 @@ module escrow::utils;
     public(package) fun src_stage(tl: &Timelocks, clock: &Clock): u8 {
         let now = timestamp_ms(clock);  // use now_seconds() if you store seconds
 
-        if (now < get_deployed_at(tl)) {
+        if (now < get_src_created_at(tl)) {
             stage_finality_lock()
         } else if (now < get_src_public_withdrawal_time(tl)) {
             // Resolver has exclusive right to reveal the secret
@@ -134,7 +133,7 @@ module escrow::utils;
     public(package) fun dst_stage(tl: &Timelocks, clock: &Clock): u8 {
         let now = timestamp_ms(clock);  // use now_seconds() if you store seconds
 
-        if (now < get_deployed_at(tl)) {
+        if (now < get_dst_created_at(tl)) {
             stage_finality_lock()
         } else if (now < get_dst_public_withdrawal_time(tl)) {
             stage_resolver_exclusive_withdraw()

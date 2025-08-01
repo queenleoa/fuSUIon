@@ -43,7 +43,7 @@ module escrow::escrow_withdraw;
 
             // Authorisation by stage
             if (current_stage == stage_resolver_exclusive_withdraw()) {
-                assert!(caller == structs::get_resolver(imm), e_unauthorised());
+                assert!(caller == structs::get_taker(imm), e_unauthorised());
             } else if (current_stage == stage_public_withdraw()) {
                 // anyone can withdraw
             } else {
@@ -110,7 +110,7 @@ module escrow::escrow_withdraw;
 
             // Authorisation by stage
             if (current_stage == stage_resolver_exclusive_withdraw()) {
-                assert!(caller == structs::get_resolver(imm), e_unauthorised());
+                assert!(caller == structs::get_taker(imm), e_unauthorised());
             } else if (current_stage == stage_public_withdraw()) {
                 // anyone can withdraw
             } else {

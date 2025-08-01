@@ -188,7 +188,7 @@ module escrow::escrow_create;
         
         // Create timelocks struct
         let timelocks = structs::create_timelocks(
-            sui::clock::timestamp_ms(clock), // deployed_at
+            // deployed_at
             src_withdrawal,
             src_public_withdrawal,
             src_cancellation,

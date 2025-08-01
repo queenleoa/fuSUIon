@@ -20,7 +20,7 @@ module escrow::constants;
 
 // ============ Rescue Delay ============
 
-    public fun rescue_delay_period(): u64 { 3600 } // 0.001 SUI
+    public fun rescue_delay_period(): u64 { 3600000 } //1 hour to return funds 
 
 // ============ Safety Deposit ============
 
@@ -52,4 +52,10 @@ module escrow::constants;
     public fun e_safety_deposit_too_low(): u64 { 1014 }
     public fun e_wallet_inactive(): u64 { 1015 }
     public fun e_invalid_order_hash(): u64 { 1016 }
+
+     /// partial fill and dutch auction errors
+    public fun e_auction_violated(): u64 { 1017 }
+    public fun e_secret_index_used(): u64 { 1014 }
+    public fun e_invalid_merkle_proof(): u64 { 1015 }
+
 
