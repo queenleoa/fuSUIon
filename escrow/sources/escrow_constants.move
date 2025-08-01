@@ -20,7 +20,7 @@ module escrow::constants;
 
 // ============ Rescue Delay ============
 
-    public fun rescue_delay_period(): u64 { 3600000 } //1 hour to return funds 
+    public fun rescue_delay_period(): u64 { 3600000 } //1 hour to return funds for demo
 
 // ============ Safety Deposit ============
 
