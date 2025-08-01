@@ -2,7 +2,6 @@
 module escrow::utils;
 
     use sui::hash;
-    use std::bcs;
     use escrow::structs::{
         EscrowImmutables, 
         Timelocks,
@@ -23,7 +22,6 @@ module escrow::utils;
         stage_public_withdraw,
         stage_resolver_exclusive_cancel,
         stage_public_cancel,
-        e_invalid_merkle_proof,
     };
 
     // ============ Immutables Validation Functions ============
@@ -163,7 +161,7 @@ module escrow::utils;
     ): u64 {
         let start_time = created_at;
         let end_time = created_at + duration;
-        
+
         // Clamp current time between start and end
         let t = if (current_time < start_time) {
             start_time
@@ -191,8 +189,8 @@ module escrow::utils;
     /// Get making amount based on taking amount (1inch style)
     /// Returns how much maker tokens for given taker tokens (following price curve)
     public fun get_making_amount<T>(
-        wallet: &Wallet<T>,
-        taking_amount: u64,
+        wallet: &Wallet<T>, //gives absolute making amount and taking amount 
+        taking_amount: u64, //relative taking amount
         clock: &Clock,
     ): u64 {
         let start_time = structs::wallet_created_at(wallet);
@@ -202,15 +200,15 @@ module escrow::utils;
         let calculated_taking_amount = calculate_auction_taking_amount(
             start_time,
             end_time,
-            structs::wallet_taking_amount(wallet), // Start high
-            structs::wallet_taking_amount(wallet), // End low (can be different for actual auction)
+            structs::wallet_making_amount(wallet), // Start high
+            structs::wallet_taking_amount(wallet), // End low 
             current_time
         );
         
         // makingAmount * takingAmount / calculatedTakingAmount
-        let making_u128 = (structs::wallet_making_amount(wallet) as u128);
-        let taking_u128 = (taking_amount as u128);
-        let calc_taking_u128 = (calculated_taking_amount as u128);
+        let making_u128 = (structs::wallet_making_amount(wallet) as u128); //absolute making amount
+        let taking_u128 = (taking_amount as u128); //relative taking amount (partial fills)
+        let calc_taking_u128 = (calculated_taking_amount as u128); //absolute taking amount
         
         let result = (making_u128 * taking_u128) / calc_taking_u128;
         (result as u64)
@@ -219,8 +217,8 @@ module escrow::utils;
     /// Get taking amount based on making amount (1inch style)
     /// Returns how much taker tokens needed for given maker tokens
     public fun get_taking_amount<T>(
-        wallet: &Wallet<T>,
-        making_amount: u64,
+        wallet: &Wallet<T>, //gives absolute making amount and taking amount 
+        making_amount: u64, //relative making amount
         clock: &Clock,
     ): u64 {
         let start_time = structs::wallet_created_at(wallet);
@@ -230,8 +228,8 @@ module escrow::utils;
         let calculated_taking_amount = calculate_auction_taking_amount(
             start_time,
             end_time,
-            structs::wallet_taking_amount(wallet), // Start high
-            structs::wallet_taking_amount(wallet), // End low (can be different for actual auction)
+            structs::wallet_making_amount(wallet), // Start high
+            structs::wallet_taking_amount(wallet), // End low 
             current_time
         );
         
@@ -245,39 +243,6 @@ module escrow::utils;
     }
 
     // ============ Partial Fill & Merkle Functions (1inch style) ============
-
-    /// Hash a secret to get secret hash (keccak256)
-    public fun hash_secret(secret: &vector<u8>): vector<u8> {
-        assert!(vector::length(secret) == 32, e_invalid_merkle_proof());
-        hash::keccak256(secret)
-    }
-
-    /// Create merkle leaf from secret index and secret hash
-    /// Mirrors: solidityPackedKeccak256(['uint64', 'bytes32'], [idx, secretHash])
-    public fun create_merkle_leaf(index: u64, secret_hash: &vector<u8>): vector<u8> {
-        // Pack index (8 bytes) + secret_hash (32 bytes)
-        let mut packed = vector::empty<u8>();
-        
-        // Serialize index as uint64 (8 bytes, little-endian for Move)
-        let index_bytes = bcs::to_bytes(&index);
-        vector::append(&mut packed, index_bytes);
-        
-        // Append secret hash
-        vector::append(&mut packed, *secret_hash);
-        
-        // Return keccak256 of packed data
-        hash::keccak256(&packed)
-    }
-
-    /// Extract parts count from hashlock (encoded in upper 16 bits)
-    /// For single fill, returns 0
-    public fun get_parts_count_from_hashlock(hashlock: &vector<u8>): u8 {
-        // In 1inch, parts count is stored in bits 240-256 of the hashlock
-        // For MVP, we can store it separately or use a simpler encoding
-        // Here we'll read the first byte as parts count (0 = single fill)
-        if (vector::is_empty(hashlock)) return 0;
-        *vector::borrow(hashlock, 0)
-    }
 
     /// Verify merkle proof for partial fill
     /// Validates that a secret at given index is part of the merkle tree
@@ -368,11 +333,16 @@ module escrow::utils;
         let total_amount = structs::wallet_making_amount(wallet);
         let already_filled = total_amount - structs::wallet_balance(wallet);
         let new_total_filled = already_filled + fill_amount;
+        let mut min_for_index = 0;
         
         // Calculate minimum amount needed for this index
         // Each part represents roughly 1/n of the total
-        let min_for_index = (total_amount * (secret_index as u64)) / ((parts_amount + 1) as u64);
-        
+        if(secret_index < parts_amount){
+            min_for_index = (total_amount * (secret_index as u64)) / ((parts_amount + 1) as u64);
+        }
+        else if(secret_index == parts_amount){
+            min_for_index = (total_amount -already_filled);
+        };
         new_total_filled >= min_for_index
     }
 
