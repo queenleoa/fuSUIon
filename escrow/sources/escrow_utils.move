@@ -155,8 +155,8 @@ module escrow::utils;
     fun calculate_auction_taking_amount(
         created_at: u64,
         duration: u64,
-        taking_amount_start: u64,
-        taking_amount_end: u64,
+        taking_amount_start: u64, //wallet making amount is max
+        taking_amount_end: u64,   //wallet taking amount is min
         current_time: u64
     ): u64 {
         let start_time = created_at;
@@ -194,12 +194,12 @@ module escrow::utils;
         clock: &Clock,
     ): u64 {
         let start_time = structs::wallet_created_at(wallet);
-        let end_time = start_time + structs::wallet_duration(wallet);
+        let duration =  structs::wallet_duration(wallet);
         let current_time = timestamp_ms(clock);
         
         let calculated_taking_amount = calculate_auction_taking_amount(
             start_time,
-            end_time,
+            duration,
             structs::wallet_making_amount(wallet), // Start high
             structs::wallet_taking_amount(wallet), // End low 
             current_time
@@ -222,12 +222,12 @@ module escrow::utils;
         clock: &Clock,
     ): u64 {
         let start_time = structs::wallet_created_at(wallet);
-        let end_time = start_time + structs::wallet_duration(wallet);
+        let duration =  structs::wallet_duration(wallet);
         let current_time = timestamp_ms(clock);
         
         let calculated_taking_amount = calculate_auction_taking_amount(
             start_time,
-            end_time,
+            duration,
             structs::wallet_making_amount(wallet), // Start high
             structs::wallet_taking_amount(wallet), // End low 
             current_time
