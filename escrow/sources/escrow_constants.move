@@ -21,7 +21,7 @@ module escrow::constants;
 // ============ Safety Deposit ============
 
     /// Minimum safety deposit amount (in MIST)
-    public fun min_safety_deposit(): u64 { 100_000_000 } // 0.1 SUI
+    public fun min_safety_deposit(): u64 { 1_000_000 } // 0.001 SUI
 
 // ============ Error Codes ============
     

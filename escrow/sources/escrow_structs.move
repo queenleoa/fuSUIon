@@ -16,11 +16,24 @@ module escrow::structs;
     // Resolvers can pull funds from this wallet to create escrows
     // This enables partial fills - multiple resolvers can create escrows from one wallet
     // The wallet itself is NOT the escrow - it's just a funding source
+    // The wallet object is used as the order state for the maker when the order is created on SUI
     public struct Wallet<phantom T> has key, store {
         id: UID,
         order_hash: vector<u8>,
+        salt: u256,
         maker: address,
-        initial_amount: u64,
+        maker_asset: String,
+        taker_asset: String,
+        making_amount: u64, //used for dutch auction. Also a reference for the initial amount
+        taking_amount: u64, // minimum amount the taker will provide : used for dutch auction
+        duration: u64, // duration in seconds for the order : used for dutch auction
+        hashlock: vector<u8>, // keccak256(secret) for the full fill and merkle root for partial fills. This is not needed for computation but as a public reference
+        timelocks: Timelocks, // timelock configuration
+        src_safety_deposit_amount: u64, // safety deposit amount in SUI (paid by resolver)
+        dst_safety_deposit_amount: u64, // safety deposit amount in ETH (paid by resolver)
+        allow_partial_fills: bool, // whether this wallet allows partial fills
+        parts_amount: u8, // amount of parts an order is split into (n+1 secrets for partial fill)
+        used_indices: vector<u8>, // indices of used parts
         balance: Balance<T>,
         created_at: u64,
         is_active: bool
@@ -38,13 +51,11 @@ module escrow::structs;
         token_type: String,          // Token type identifier (for generic token support). Using SUI
         amount: u64,                 // Amount of tokens to be swapped
         safety_deposit_amount: u64,  // Safety deposit amount in SUI (paid by resolver)
-        resolver: address,           // Address of the resolver handling this escrow
         timelocks: Timelocks,        // Timelock configuration
     }
 
     /// Timelocks configuration
     public struct Timelocks has copy, drop, store {
-        deployed_at: u64,
         src_withdrawal: u64,
         src_public_withdrawal: u64,
         src_cancellation: u64,
@@ -61,6 +72,7 @@ module escrow::structs;
         immutables: EscrowImmutables,
         token_balance: Balance<T>,         // Maker's locked tokens (only SUI)
         safety_deposit: Balance<SUI>,        // Resolver's safety deposit
+        created_at: u64,
         status: u8,                          // Current status (active/withdrawn/cancelled)
     }
 
@@ -71,6 +83,7 @@ module escrow::structs;
         immutables: EscrowImmutables,
         token_balance: Balance<T>,         // Taker's locked tokens (only SUI)
         safety_deposit: Balance<SUI>,        // Resolver's safety deposit
+        created_at: u64,
         status: u8,                          // Current status (active/withdrawn/cancelled)
     }
 
