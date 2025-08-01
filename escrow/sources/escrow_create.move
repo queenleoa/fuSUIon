@@ -139,7 +139,7 @@ module escrow::escrow_create;
         secret_index: u8, // Index of secret being used (for partial fills)
         merkle_proof: vector<vector<u8>>, // Merkle proof (empty vector for full fills)
         taker: address,
-        making_amount: u64, // Amount taker wants to fill from maker
+        making_amount: u64, // Amount taker wants to fill from maker. We're assuming we're swapping USDC between two chains so this serves as max taking amount too.
         taking_amount: u64, // Amount taker must provide
         safety_deposit: Coin<SUI>,
         clock: &Clock,
@@ -181,9 +181,6 @@ module escrow::escrow_create;
             
             // Full fill must take entire wallet balance
             assert!(making_amount == structs::wallet_balance(wallet), e_invalid_amount());
-            
-            // Deactivate wallet after full fill
-            structs::wallet_set_active(wallet, false);
         };
         
         // Pull funds from wallet
