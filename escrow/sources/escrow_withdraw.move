@@ -16,6 +16,7 @@ module escrow::escrow_withdraw;
         stage_resolver_exclusive_withdraw,
         stage_public_withdraw,
     };
+    use escrow::constants::e_inactive_escrow;
 
     // ============ Withdrawal Functions ============
 
@@ -29,13 +30,18 @@ module escrow::escrow_withdraw;
         let caller = tx_context::sender(ctx);
 
         // ************ READ‑ONLY SCOPE ************ //
-        let (taker, maker, order_hash, amount) = {
+        let (taker, 
+            maker, 
+            order_hash, 
+            amount,
+            hashlock) = {
             let imm = structs::get_src_immutables(escrow);
+            let created_at = structs::get_src_created_at(escrow);
 
             // Stage & status checks
             let timelocks     = structs::get_timelocks(imm);
-            let current_stage = utils::src_stage(timelocks, clock);
-            assert!(structs::get_src_status(escrow) == status_active(), e_already_withdrawn());
+            let current_stage = utils::src_stage(timelocks, created_at, clock);
+            assert!(structs::get_src_status(escrow) == status_active(), e_inactive_escrow());
 
             // Secret validation
             assert!(utils::validate_secret_length(&secret), e_invalid_secret());
@@ -55,8 +61,8 @@ module escrow::escrow_withdraw;
                 let maker_local      = structs::get_maker(imm);
                 let order_hash_local = *structs::get_order_hash(imm); // vector<u8> – move, not copy
                 let amount_local     = structs::get_amount(imm);
-
-                (copy taker_local, copy maker_local, order_hash_local, amount_local)
+                let hashlock_local = *structs::get_hashlock(imm);
+                (copy taker_local, copy maker_local, order_hash_local, amount_local, hashlock_local)
                 // immutable borrow ends here
         };
         // ************ MUTATION PHASE ************ //
@@ -73,6 +79,7 @@ module escrow::escrow_withdraw;
         events::escrow_withdrawn(
             structs::get_src_address(escrow),
             order_hash,
+            hashlock,
             secret,
             caller,
             maker,
@@ -93,12 +100,17 @@ module escrow::escrow_withdraw;
 
         // ************ READ‑ONLY SCOPE ************ //
         // Returns (maker, taker, order_hash, amount)
-        let (maker, taker, order_hash, amount) = {
+        let (maker, 
+            taker, 
+            order_hash, 
+            amount,
+            hashlock) = {
             let imm = structs::get_dst_immutables(escrow);
+            let created_at = structs::get_dst_created_at(escrow);
 
             // Stage & status checks
             let timelocks     = structs::get_timelocks(imm);
-            let current_stage = utils::dst_stage(timelocks, clock);
+            let current_stage = utils::dst_stage(timelocks, created_at, clock);
             assert!(structs::get_dst_status(escrow) == status_active(), e_already_withdrawn());
 
             // Secret validation
@@ -119,10 +131,11 @@ module escrow::escrow_withdraw;
 
             let maker_local      = structs::get_maker(imm);
             let taker_local      = structs::get_taker(imm);
+            let hashlock_local = *structs::get_hashlock(imm);
             let order_hash_local = *structs::get_order_hash(imm); // vector<u8>
             let amount_local     = structs::get_amount(imm);
 
-            (copy maker_local, copy taker_local, order_hash_local, amount_local)
+            (copy maker_local, copy taker_local, order_hash_local, amount_local, hashlock_local)
             // ← immutable borrow ends here
         };
         //************ MUTATION PHASE ************//
@@ -139,6 +152,7 @@ module escrow::escrow_withdraw;
         events::escrow_withdrawn(
             structs::get_dst_address(escrow),
             order_hash,
+            hashlock,
             secret,
             caller,
             maker,
