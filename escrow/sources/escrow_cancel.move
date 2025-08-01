@@ -8,7 +8,7 @@ module escrow::escrow_cancel;
     use escrow::utils;
     use escrow::constants::{
         e_unauthorised,
-        e_already_cancelled,
+        e_inactive_escrow,
         e_not_cancellable,
         status_active,
         status_cancelled,
@@ -32,11 +32,12 @@ module escrow::escrow_cancel;
         // Returns (maker, taker, order_hash, amount)
         let (maker, taker, order_hash, amount) = {
             let imm = structs::get_src_immutables(escrow);
+            let created_at = structs::get_src_created_at(escrow);
 
             // Stage & status checks
             let timelocks     = structs::get_timelocks(imm);
-            let current_stage = utils::src_stage(timelocks, clock);
-            assert!(structs::get_src_status(escrow) == status_active(), e_already_cancelled());
+            let current_stage = utils::src_stage(timelocks, created_at, clock);
+            assert!(structs::get_src_status(escrow) == status_active(), e_inactive_escrow());
 
             // Authorisation by stage
             if (current_stage == stage_resolver_exclusive_cancel()) {
@@ -89,11 +90,12 @@ module escrow::escrow_cancel;
         // Returns (maker, taker, order_hash, amount)
         let (maker, taker, order_hash, amount) = {
             let imm = structs::get_dst_immutables(escrow);
+            let created_at = structs::get_dst_created_at(escrow);
 
             // Stage & status checks
             let timelocks     = structs::get_timelocks(imm);
-            let current_stage = utils::dst_stage(timelocks, clock);
-            assert!(structs::get_dst_status(escrow) == status_active(), e_already_cancelled());
+            let current_stage = utils::dst_stage(timelocks,created_at, clock);
+            assert!(structs::get_dst_status(escrow) == status_active(), e_inactive_escrow());
 
             // Must be past (or at) resolver‑exclusive‑cancel stage
             assert!(current_stage >= stage_resolver_exclusive_cancel(), e_not_cancellable());

@@ -39,7 +39,7 @@ module escrow::constants;
     /// State errors
     public fun e_already_withdrawn(): u64 { 1006 }
     public fun e_not_withdrawable(): u64 { 1007 }
-    public fun e_already_cancelled(): u64 { 1008 }
+    public fun e_inactive_escrow(): u64 { 1008 }
     public fun e_not_cancellable(): u64 { 1009 }
     
     /// Access errors
