@@ -333,17 +333,23 @@ module escrow::utils;
         let total_amount = structs::wallet_making_amount(wallet);
         let already_filled = total_amount - structs::wallet_balance(wallet);
         let new_total_filled = already_filled + fill_amount;
-        let mut min_for_index = 0;
-        
+     
         // Calculate minimum amount needed for this index
         // Each part represents roughly 1/n of the total
-        if(secret_index < parts_amount){
-            min_for_index = (total_amount * (secret_index as u64)) / ((parts_amount + 1) as u64);
-        }
-        else if(secret_index == parts_amount){
-            min_for_index = (total_amount -already_filled);
-        };
-        new_total_filled >= min_for_index
+        //lowerbound index
+        // ----- bucket math -----
+    // Boundaries are (index / parts_amount) * total
+            let denom = parts_amount as u64;
+
+            let min_for_idx = (total_amount * (secret_index as u64)) / denom;          // lower bound inclusive
+            let max_for_idx =
+                if (secret_index < parts_amount) {
+                    (total_amount * ((secret_index + 1) as u64)) / denom               // upper bound exclusive
+                } else {
+                    total_amount                                                      // last bucket – up to 100 %
+                };
+
+            (new_total_filled >= min_for_idx) && (new_total_filled < max_for_idx)
     }
 
     // ============ Helper Functions ============
