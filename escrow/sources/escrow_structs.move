@@ -225,7 +225,7 @@ module escrow::structs;
             dst_safety_deposit_amount,
             allow_partial_fills,
             parts_amount,
-            last_used_index: 0,
+            last_used_index: 255,
             balance: initial_balance,
             created_at,
             is_active: true,

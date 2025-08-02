@@ -1,5 +1,5 @@
 #[test_only]
-#[allow(implicit_const_copy)]
+#[allow(unused_variable, implicit_const_copy)]
 
 module escrow::escrow_tests;
 
@@ -174,7 +174,7 @@ module escrow::escrow_tests;
             let wallet = test::take_shared<Wallet<TEST>>(&scenario);
             assert!(structs::wallet_allow_partial_fills(&wallet) == true, 0);
             assert!(structs::wallet_parts_amount(&wallet) == 4, 1);
-            assert!(structs::wallet_last_used_index(&wallet) == 0, 2);
+            assert!(structs::wallet_last_used_index(&wallet) == 255, 2);
             test::return_shared(wallet);
         };
         

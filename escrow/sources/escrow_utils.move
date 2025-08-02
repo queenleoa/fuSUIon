@@ -319,14 +319,20 @@ module escrow::utils;
         let parts_amount = structs::wallet_parts_amount(wallet);
         let last_used_index = structs::wallet_last_used_index(wallet);
         
-        // Index must be greater than last used
-        if (secret_index <= last_used_index) {
-            return false
-        };
-        
-        // Index must be within valid range (0 to parts_amount)
-        if (secret_index > parts_amount) {
-            return false
+       // Special handling for uninitialized state
+        if (last_used_index == 255) {
+            // First use - index must be valid for the fill amount
+            if (secret_index > parts_amount) {
+                return false
+            };
+        } else {
+            // Subsequent uses - must be greater than last used
+            if (secret_index <= last_used_index) {
+                return false
+            };
+            if (secret_index > parts_amount) {
+                return false
+            };
         };
         
         // For partial fills, calculate if fill amount justifies using this index
@@ -349,7 +355,13 @@ module escrow::utils;
                     total_amount                                                      // last bucket – up to 100 %
                 };
 
+                if (secret_index == parts_amount) {
+            // Special case for last index - must fill exactly to 100%
+            new_total_filled == total_amount
+        } else {
+            // Normal bucket range check
             (new_total_filled >= min_for_idx) && (new_total_filled < max_for_idx)
+        }
     }
 
     // ============ Helper Functions ============
